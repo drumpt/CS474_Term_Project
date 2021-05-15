@@ -1,42 +1,47 @@
 import os
+import string
 import json
 
-import pandas as pd
+import nltk
 
-def get_json_list_from_data_dir(data_dir):
-    '''
-    Parameters
-    ----------
-    data_dir: directory where json files exist
+def tokenization(self, sentence):
+    return nltk.tokenize.word_tokenize(sentence)
 
-    Return
-    ----------
-    json_list: list contains all directories of json files in data_dir
+def remove_punctuation(self, words):
+    return [word for word in words if not word in string.punctuation and not word[0].isdigit()]
 
-    '''
+def identifier_normalization(self, words):
+    normalized_words = []
+    for word in words:
+        if self.snake_case_breakdown(word)[0] != word:
+            normalized_words.extend(self.snake_case_breakdown(word))
+        elif word.isalnum() and self.camel_case_breakdown(word)[0] != word:
+            normalized_words.extend(self.camel_case_breakdown(word))
+        else:
+            normalized_words.append(word)
+    return normalized_words
 
-    json_list = []
-    for file in os.listdir(data_dir):
-        if file.endswith(".json"):
-            json_list.append(os.path.join(data_dir, file))
-    return json_list
+def case_normalization(self, words):
+    return [word.lower() for word in words]
 
-def get_dataframe_from_json_list(json_list):
-    '''
-    Parameters
-    ----------
-    json_list: list contains all directories of json files
+def stop_word_filtering(self, words):
+    stop_words = nltk.corpus.stopwords.words("english")
+    return [word for word in words if not word in stop_words]
 
-    Return
-    ----------
-    df: pandas dataframe extracted and concatenated from json files in json_list
+def stemming(self, words):
+    snowball = nltk.stem.SnowballStemmer("english")
+    return [snowball.stem(word) for word in words]
 
-    '''
+def snake_case_breakdown(self, identifier):
+    return identifier.split("_")
 
-    df_list = [] # first use list for memory efficiency
-    for json_dir in json_list:
-        with open(json_dir, 'r') as f:
-            data = json.load(f)
-        df_list.append(pd.DataFrame.from_dict(data))
-    df = pd.concat(df_list)
-    return df
+def camel_case_breakdown(self, identifier):
+    idx = list(map(str.isupper, identifier))
+    l = [0]
+    for (i, (x, y)) in enumerate(zip(idx, idx[1:])):
+        if x and not y: # "Ul"
+            l.append(i)
+        elif not x and y: # "lU"
+            l.append(i+1)
+    l.append(len(identifier))
+    return [identifier[x:y] for x, y in zip(l, l[1:]) if x < y]
