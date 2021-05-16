@@ -1,6 +1,7 @@
 import os
 import string
 import json
+import re
 
 import nltk
 
@@ -12,9 +13,16 @@ def tokenization(body):
 
 def remove_punctuation(words):
     '''
-    Remove all the punctuations like "!()-[]{};:'"\,<>./?@#$%^&*_~" in words
+    Remove all the punctuations like !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ in words
     '''
-    return [word for word in words if not word in string.punctuation]
+    def match(word, punctuation_list):
+        for punctuation in punctuation_list:
+            if re.match(f"\{punctuation}+", word):
+                return True
+        return False
+
+    punctuation_list = string.punctuation
+    return [word for word in words if not match(word, punctuation_list)]
 
 def case_normalization(words):
     '''
@@ -36,7 +44,7 @@ def stemming(words):
     snowball = nltk.stem.SnowballStemmer("english")
     return [snowball.stem(word) for word in words]
 
-def preprocess_body(body):
+def preprocess(body):
     '''
     tokenization -> remove_punctuation -> case_normalization -> stop_word_filtering -> stemming
     '''

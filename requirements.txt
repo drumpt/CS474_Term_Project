@@ -1,6 +1,7 @@
-pandas
 argparse
+pandas
 nltk
-
+sklearn
+numpy
 # torch
 # tensorflow

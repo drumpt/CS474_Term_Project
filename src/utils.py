@@ -39,4 +39,5 @@ def get_dataframe_from_json_list(json_list):
             data = json.load(f)
         df_list.append(pd.DataFrame.from_dict(data))
     df = pd.concat(df_list).reset_index(drop = True)
+    df.columns = ['title', 'author', 'time', 'description', 'body', 'section']
     return df
