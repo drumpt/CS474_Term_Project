@@ -1,6 +1,6 @@
 import math
-from collections import Counter
 import copy
+from collections import Counter
 
 import numpy as np
 
@@ -18,10 +18,9 @@ class InformationRetrieval:
         self.total_body_bow = self.get_total_bow(self.body_bow_list)
 
         for i, issue in enumerate(self.issue_bow_list):
-            on_issue_event_idxs = self.on_issue_event_tracking(issue, self.body_bow_list, mode = config["on_issue_event_tracking_mode"])
-            events = [self.df.iloc[idx, 0] for idx in on_issue_event_idxs]
+            on_issue_event_idxs = self.on_issue_event_tracking(issue, self.body_bow_list, mode = config["on_issue_event_tracking"]["mode"])
             detailed_info = self.get_detailed_info_dict_from_event_idx_list(on_issue_event_idxs)
-            self.print_on_issue_event_tracking_result(self.issue_list[i], events, detailed_info)
+            self.print_on_issue_event_tracking_result(self.issue_list[i], detailed_info.keys(), detailed_info)
 
     def get_total_bow(self, body_bow_list):
         total_bow = dict()
@@ -40,7 +39,7 @@ class InformationRetrieval:
         return bow
 
     def on_issue_event_tracking(self, issue, body_bow_list, mode = 'normal', num_events = 5, weight_on_original_issue = 0.8): # mode = 'normal' or 'consecutive'
-        # TODO: apply clustering (different articles many indicate same event)
+        # TODO: apply clustering (different articles may indicate same event)
         on_issue_events = [] # index of each document
 
         if mode == 'normal':
@@ -84,7 +83,6 @@ class InformationRetrieval:
                     break
                 else:
                     on_issue_events.append(in_order_event)
-
         return on_issue_events
 
     def get_detailed_info_dict_from_event_idx_list(self, event_idx_list):
@@ -98,7 +96,6 @@ class InformationRetrieval:
     def print_on_issue_event_tracking_result(self, issue, events, detailed_info):
         events_str = " -> ".join(events)
         cmd = f"[ Issue ]\n\n{issue}\n\n[ On-Issue Events ]\n\n{events_str}\n\n[ Detailed Information (per event)]\n\n"
-
         for event, info in detailed_info.items():
             person = ", ".join(info["person"])
             organization = ", ".join(info["organization"])
@@ -109,7 +106,6 @@ class InformationRetrieval:
             detailed_info_str += f"    -    Organizaiton: {organization}\n"
             detailed_info_str += f"    -    Place: {place}\n\n"
             cmd += detailed_info_str
-
         print(cmd)
 
     def score_document(self, query, document, mode = 'tfidf'): # mode = 'tfidf' or 'bm25'
