@@ -3,5 +3,6 @@ pandas
 nltk
 sklearn
 numpy
+gensim
 # torch
 # tensorflow
