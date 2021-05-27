@@ -1,6 +1,22 @@
 {
     "data_dir": "sample_dataset",
+    "lda": {
+        "num_trends": 10
+    },
+    "doc2vec": {
+        "epoch": 10,
+        "random_seed": 42
+    },
+    "clustering": {
+        "method": "DBSCAN",
+        "weight": {
+            "title": 0,
+            "body": 1,
+            "time": 0,
+            "ssection": 0
+        }
+    },
     "on_issue_event_tracking": {
-        "mode": "normal"
+        "mode": "consecutive"
     }
 }

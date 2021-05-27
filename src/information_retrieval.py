@@ -6,16 +6,19 @@ import numpy as np
 
 import preprocess
 
-class InformationRetrieval:
-    # TODO: LDA or WordRank
-    # TODO: Identify the events related issue from the article
-
+class OnIssueEventTracking:
     def __init__(self, df, issue_list, config):
+        self.preprocessor = preprocess.Preprocessor()
+
         self.df = df
         self.issue_list = issue_list
-        self.body_bow_list = [self.get_bow_from_words(preprocess.preprocess(body)) for body in df["body"]]
-        self.issue_bow_list = [self.get_bow_from_words(preprocess.preprocess(issue)) for issue in issue_list]
-        self.total_body_bow = self.get_total_bow(self.body_bow_list)
+
+        # TODO: use index (modify self.body_bow_list, self.issue_bow_list)
+        self.body_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(body)) for body in df["body"]]
+        self.issue_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(issue)) for issue in issue_list]
+        # self.total_body_bow = self.get_total_bow(self.body_bow_list)
+
+        self.ir = InformationRetrieval(self.body_bow_list)
 
         for i, issue in enumerate(self.issue_bow_list):
             on_issue_event_idxs = self.on_issue_event_tracking(issue, self.body_bow_list, mode = config["on_issue_event_tracking"]["mode"])
@@ -45,7 +48,7 @@ class InformationRetrieval:
         if mode == 'normal':
             body_score_list = []
             for body_bow in body_bow_list:
-                body_score_list.append(self.score_document(issue, body_bow))
+                body_score_list.append(self.ir.score_document(issue, body_bow))
             body_score_dict = {k : v for k, v in enumerate(body_score_list)}
 
             on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
@@ -67,7 +70,7 @@ class InformationRetrieval:
 
                 body_score_list = []
                 for body_bow in body_bow_list:
-                    body_score_list.append(self.score_document(in_order_issue, body_bow))
+                    body_score_list.append(self.ir.score_document(in_order_issue, body_bow))
                 body_score_dict = {k : v for k, v in enumerate(body_score_list)}
 
                 on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
@@ -107,6 +110,12 @@ class InformationRetrieval:
             detailed_info_str += f"    -    Place: {place}\n\n"
             cmd += detailed_info_str
         print(cmd)
+
+class InformationRetrieval:
+    # TODO: Identify the events related issue from the article
+
+    def __init__(self, body_bow_list):
+        self.body_bow_list = body_bow_list
 
     def score_document(self, query, document, mode = 'tfidf'): # mode = 'tfidf' or 'bm25'
         if self.norm(query) * self.norm(document) == 0:

@@ -33,6 +33,8 @@ class LDA:
         topics = ldamodel.print_topics(num_words=5)
         return topics
 
+    def get_topics(self):
+        return self.topics
 
 if __name__ == "__main__":
     lda_class = LDA("../dataset", 10)

@@ -1,18 +1,28 @@
 import json
 
 import argparse
-import pandas as pd
 
 import utils
 import preprocess
+import lda_test
+import clustering
 import information_retrieval
 
 def main(config):
     json_list = utils.get_json_list_from_data_dir(config["data_dir"])
     df = utils.get_dataframe_from_json_list(json_list)
 
+    # lda = lda_test.LDA(config["data_dir"], config["lda"]["num_trends"])
+    # issue_list = lda.get_topics()
     issue_list = ['North Korea', 'Pyeongchang Olympic'] # hard-coded issues
-    ir = information_retrieval.InformationRetrieval(df, issue_list, config)
+
+    vectorizer = clustering.Vectorizer(df, config)
+    vectorized_df = vectorizer.train()
+
+    clusterizer = clustering.Clustering(vectorized_df, config)
+    clustered_df = clusterizer.apply_clustering()
+
+    # ir = information_retrieval.OnIssueEventTracking(vectorized_df, issue_list, config)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
