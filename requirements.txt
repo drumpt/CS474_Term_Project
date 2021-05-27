@@ -4,5 +4,6 @@ nltk
 sklearn
 numpy
 gensim
+python-Levenshtein
 # torch
 # tensorflow
