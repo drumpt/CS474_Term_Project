@@ -4,6 +4,8 @@ import json
 import re
 
 import nltk
+nltk.download('punkt')
+nltk.download('stopwords')
 
 class Preprocessor:
     def __init__(self):

@@ -5,11 +5,11 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
+np.seterr(divide='ignore', invalid='ignore')
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.models.callbacks import CallbackAny2Vec
-from sklearn.preprocessing import MinMaxScaler
 
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, OPTICS, AgglomerativeClustering
 
 import preprocess
 
@@ -17,19 +17,19 @@ class Vectorizer:
     def __init__(self, df, config):
         self.preprocessor = preprocess.Preprocessor()
         self.df = df
-        self.df['preprocessed_body'] = df['body'].apply(self.preprocessor.preprocess)
-        self.df['preprocessed_title'] = df['title'].apply(self.preprocessor.preprocess)
+        self.df["preprocessed_body"] = df["body"].apply(self.preprocessor.preprocess)
+        self.df["preprocessed_title"] = df["title"].apply(self.preprocessor.preprocess)
+        self.tagged_body = [TaggedDocument(words = row["preprocessed_body"], tags = [row["id"]]) for _, row in self.df.iterrows()]
+        self.part_weight = config["doc2vec"]["part_weight"]
 
-        self.vector_weight = config["doc2vec"]["weight"]
-        self.output_dir = config["doc2vec"]["output_dir"]
-
-        self.callback = Callback(output_dir = self.output_dir)
-
+        # hyperparameters for doc2vec training
         self.epoch = config["doc2vec"]["epoch"]
-        self.tagged_body = [TaggedDocument(words = row['preprocessed_body'], tags = [row['id']]) for _, row in self.df.iterrows()]
+        self.output_dir = config["doc2vec"]["output_dir"]
+        self.weight_dir = config["doc2vec"]["weight_dir"]
+        self.callback = Callback(output_dir = self.output_dir)
         self.model = Doc2Vec(
             window = 10,
-            vector_size = 256,
+            vector_size = config["doc2vec"]["embedding_dim"],
             alpha = 0.025,
             min_count = 2,
             dm = 1,
@@ -39,67 +39,99 @@ class Vectorizer:
         )
         self.model.build_vocab(self.tagged_body)
 
-
     def train(self):
         self.model.train(
             self.tagged_body,
             total_examples = self.model.corpus_count,
             epochs = self.epoch,
-            callbacks = [self.callback]
+            callbacks = [self.callback],
+            compute_loss = True
         )
 
     def vectorize(self):
-        self.df['vectorized_body'] = self.df['preprocessed_body'].apply(self.model.infer_vector)
-        self.df['vectorized_title'] = self.df['preprocessed_title'].apply(self.model.infer_vector)
+        if not os.path.exists(self.weight_dir):
+            raise Exception(f"File not found: {self.weight_dir}")
+        else:
+            self.model = Doc2Vec.load(self.weight_dir)
 
-        # TODO: consider section vector
-        self.df['vectorized_section'] = 0
+        def time_to_timestamp(t):
+            return time.mktime(datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timetuple())
 
-        time_to_timestamp = lambda t: time.mktime(datetime.strptime(t, '%Y-%m-%d %H:%M:%S').timetuple())
-        scaler = lambda x: MinMaxScaler().fit_transform(x.reshape(-1, 1))
-        self.df['vectorized_time'] = self.df['time'].apply(time_to_timestamp).apply(scaler)
+        def normalize(x):
+            x_list = []
+            for i in range(len(x)):
+                try:
+                    x_list.append(list(x[i]))
+                except: # vectorized_time
+                    x_list.append(x[i])
+            x = np.array(x_list, dtype = float)
+            return (x - np.mean(x, axis = 0, keepdims = True)) / np.std(x, axis = 0, keepdims = True)
 
-        # self.df['weighted_vector'] = self.weight['title'] * self.df['vectorized_title'] \
-        #     + self.vector_weight['body'] * self.df['vectorized_body'] \
-        #     + self.vector_weight['section'] * self.df['vectorized_section'] \
-        #     + self.vector_weight['time'] * self.df['vectorized_time']
-        # return self.df
+        self.df["vectorized_title"] = self.df["preprocessed_title"].apply(self.model.infer_vector)
+        # TODO: calculate section vector
+        self.df["vectorized_section"] = self.df["preprocessed_body"].apply(self.model.infer_vector)
+        self.df["vectorized_body"] = self.df["preprocessed_body"].apply(self.model.infer_vector)
+        self.df["vectorized_time"] = self.df["time"].apply(time_to_timestamp)
 
-    # def predict(self, body):
-    #     result = self.model.infer_vector(self.preprocessor.preprocess(body))
-    #     return result
+        vectorized_full_text = self.part_weight["title"] * normalize(self.df["vectorized_title"]) \
+            + self.part_weight["body"] * normalize(self.df["vectorized_body"]) \
+            + self.part_weight["section"] * normalize(self.df["vectorized_section"])
+        vectorized_time = np.expand_dims(normalize(self.df['vectorized_time']), axis = 1)
+
+        self.df["vector"] = pd.Series(np.concatenate((vectorized_full_text, vectorized_time), axis = 1).tolist())
+        return self.df
 
 
 class Callback(CallbackAny2Vec):
     def __init__(self, output_dir):
         self.epoch = 0
         self.output_dir = output_dir
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def on_epoch_end(self, model):
         loss = model.get_latest_training_loss()
-        model.save(os.path.join(self.output_dir, f"weights_{self.epoch:03d}_{loss:.4f}.gz"))
-        print(f'Epoch : {self.epoch} loss : {loss}')
+        model.save(os.path.join(self.output_dir, f"weights_{self.epoch:03d}_{loss:.4f}.h5"))
+        print(f"Epoch : {self.epoch} loss : {loss}")
         self.epoch += 1
 
 
 class Clustering:
     def __init__(self, df, config):
         self.df = df
-        self.weight = config["clustering"]["weight"]
         self.method = config["clustering"]["method"]
 
     def apply_clustering(self):
-        pass
-        # n_classes = {}
 
-        # if self.method == "DBSCAN":
-        #     for i in np.arange(0.0001, 1, 0.0002):
-        #         dbscan = DBSCAN(eps = i, min_samples = 1, metric = 'cosine').fit(self.df["vectorized_body"].tolist())
-        #         n_classes.update({i: len(pd.Series(dbscan.labels_).value_counts())})
+        if self.method == "DBSCAN":
+            # experiemnt
+            for i in np.arange(0.001, 1, 0.001):
+                clusterizer = DBSCAN(eps = i, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
+                print(i, len(pd.Series(clusterizer.labels_).value_counts()))
+
+            clusterizer = DBSCAN(eps = 0.3, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
+
+        elif self.method == "hierarchical":
+            # # experiemnt
+            # for i in np.arange(0.01, 100, 0.01):
+            #     clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = i).fit(self.df["vector"].tolist())
+            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
+
+            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 10).fit(self.df["vector"].tolist())
+
+        elif self.method == "OPTICS":
+            # # experiemnt
+            # for i in np.arange(1, 100):
+            #     clusterizer = OPTICS(eps = i, min_samples = 2).fit(self.df["vector"].tolist())
+            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
+
+            clusterizer = OPTICS(eps = 1, min_samples = 2).fit(self.df["vector"].tolist())
+        else:
+            raise Exception(f"Invalid: {self.weight_dir}")            
         
-        #     dbscan = DBSCAN(eps = 0.15, min_samples = 1, metric = 'cosine').fit(self.df["vectorized_body"].tolist())
-        #     self.df["cluster_number"] = dbscan.labels_
+        self.df["cluster_number"] = clusterizer.labels_
+        return self.df
 
-        # # return self.df
-
-        # print(n_classes)
+    # TODO: need to evaluate various clustering algorithms
+    def evaluate(self):
+        pass

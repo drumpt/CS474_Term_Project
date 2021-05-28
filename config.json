@@ -1,21 +1,22 @@
 {
-    "data_dir": "dataset",
+    "data_dir": "sample_dataset",
     "lda": {
         "num_trends": 10
     },
     "doc2vec": {
+        "part_weight": {
+            "title": 0.25,
+            "body": 0.75,
+            "section": 0.0
+        },
         "epoch": 50,
+        "embedding_dim": 256,
         "output_dir": "weights",
-        "model_dir": null,
-        "random_seed": 42,
-        "weight": {
-            "title": 0.3,
-            "body": 0.7,
-            "ssection": 0
-        }
+        "weight_dir": "weights/weights_049_0.0000.h5",
+        "random_seed": 42
     },
     "clustering": {
-        "method": "DBSCAN"
+        "method": "hierarchical"
     },
     "on_issue_event_tracking": {
         "mode": "consecutive"

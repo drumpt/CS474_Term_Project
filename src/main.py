@@ -14,17 +14,17 @@ def main(config):
 
     # lda = lda_test.LDA(config["data_dir"], config["lda"]["num_trends"])
     # issue_list = lda.get_topics()
-    issue_list = ['North Korea', 'Pyeongchang Olympic'] # hard-coded issues
+    issue_list = ['North Korea\'s Nuclear', 'Pyeongchang Olympic'] # hard-coded issues
 
     vectorizer = clustering.Vectorizer(df, config)
-    vectorizer.train()
+    # vectorizer.train()
     vectorized_df = vectorizer.vectorize()
-    print(vectorized_df)
 
     clusterizer = clustering.Clustering(vectorized_df, config)
     clustered_df = clusterizer.apply_clustering()
 
-    # ir = information_retrieval.OnIssueEventTracking(vectorized_df, issue_list, config)
+    on_issue_event_tracker = information_retrieval.OnIssueEventTracking(clustered_df, issue_list, config)
+    on_issue_event_tracker.apply_on_issue_event_tracking()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
