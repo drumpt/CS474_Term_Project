@@ -17,7 +17,9 @@ def main(config):
     issue_list = ['North Korea', 'Pyeongchang Olympic'] # hard-coded issues
 
     vectorizer = clustering.Vectorizer(df, config)
-    vectorized_df = vectorizer.train()
+    vectorizer.train()
+    vectorized_df = vectorizer.vectorize()
+    print(vectorized_df)
 
     clusterizer = clustering.Clustering(vectorized_df, config)
     clustered_df = clusterizer.apply_clustering()
