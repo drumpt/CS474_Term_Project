@@ -1,0 +1,3 @@
+[submodule "submodules/BERT-NER"]
+	path = submodules/bert_ner
+	url = https://github.com/kamalkraj/BERT-NER.git

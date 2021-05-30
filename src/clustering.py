@@ -109,7 +109,7 @@ class Clustering:
                 clusterizer = DBSCAN(eps = i, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
                 print(i, len(pd.Series(clusterizer.labels_).value_counts()))
 
-            clusterizer = DBSCAN(eps = 0.3, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
+            clusterizer = DBSCAN(eps = 0.1, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
 
         elif self.method == "hierarchical":
             # # experiemnt
@@ -117,7 +117,7 @@ class Clustering:
             #     clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = i).fit(self.df["vector"].tolist())
             #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
 
-            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 10).fit(self.df["vector"].tolist())
+            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5).fit(self.df["vector"].tolist())
 
         elif self.method == "OPTICS":
             # # experiemnt
@@ -125,7 +125,7 @@ class Clustering:
             #     clusterizer = OPTICS(eps = i, min_samples = 2).fit(self.df["vector"].tolist())
             #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
 
-            clusterizer = OPTICS(eps = 1, min_samples = 2).fit(self.df["vector"].tolist())
+            clusterizer = OPTICS(eps = 0.1, min_samples = 2).fit(self.df["vector"].tolist())
         else:
             raise Exception(f"Invalid: {self.weight_dir}")            
         

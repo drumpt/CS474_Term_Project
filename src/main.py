@@ -14,7 +14,7 @@ def main(config):
 
     # lda = lda_test.LDA(config["data_dir"], config["lda"]["num_trends"])
     # issue_list = lda.get_topics()
-    issue_list = ['North Korea\'s Nuclear', 'Pyeongchang Olympic'] # hard-coded issues
+    issue_list = ['North Korea', 'Pyeongchang Olympic'] # hard-coded issues
 
     vectorizer = clustering.Vectorizer(df, config)
     # vectorizer.train()

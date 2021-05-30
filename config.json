@@ -5,9 +5,9 @@
     },
     "doc2vec": {
         "part_weight": {
-            "title": 0.25,
-            "body": 0.75,
-            "section": 0.0
+            "title": 0,
+            "body": 1,
+            "section": 0
         },
         "epoch": 50,
         "embedding_dim": 256,
@@ -19,6 +19,10 @@
         "method": "hierarchical"
     },
     "on_issue_event_tracking": {
-        "mode": "consecutive"
+        "method": "consecutive"
+    },
+    "detailed_info_extractor": {
+        "method": "title",
+        "ner_model_dir": "submodules/bert_ner/out_large"
     }
 }

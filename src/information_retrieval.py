@@ -1,10 +1,18 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 import math
+import random
+import time
+from datetime import datetime
 import copy
 from collections import Counter
 
 import numpy as np
+from transformers import pipeline
 
 import preprocess
+from submodules.bert_ner.bert import Ner
 
 class OnIssueEventTracking:
     def __init__(self, df, issue_list, config):
@@ -13,8 +21,7 @@ class OnIssueEventTracking:
         self.config = config
 
         self.preprocessor = preprocess.Preprocessor()
-        self.detailed_info_extractor = DetailedInfoExtractor(df)
-        self.information_retriever = InformationRetrieval(self.body_bow_list)
+        self.detailed_info_extractor = DetailedInfoExtractor(df, config)
 
         self.cluster_number_to_docs = {cluster_number : self.get_cluster_number_to_docs(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
         self.cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
@@ -24,11 +31,13 @@ class OnIssueEventTracking:
         self.idx_to_cluster_number = [cluster_number for cluster_number, avg_bow in self.cluster_number_to_docs_and_avg_bow]
         self.issue_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(issue)) for issue in issue_list]
 
+        self.information_retriever = InformationRetrieval(self.body_bow_list)
+
     def apply_on_issue_event_tracking(self):
         for i, issue in enumerate(self.issue_bow_list):
-            on_issue_event_clusters = self.on_issue_event_tracking(issue, self.body_bow_list, mode = self.config["on_issue_event_tracking"]["mode"])
-            detailed_info = self.get_detailed_info_dict_from_event_clusters(on_issue_event_clusters)
-            self.print_on_issue_event_tracking_result(self.issue_list[i], detailed_info.keys(), detailed_info)
+            on_issue_event_clusters = self.on_issue_event_tracking(issue, self.body_bow_list, method = self.config["on_issue_event_tracking"]["method"])
+            detailed_info = self.get_detailed_info_list_from_event_clusters(on_issue_event_clusters)
+            self.print_on_issue_event_tracking_result(self.issue_list[i], detailed_info)
 
     def get_total_bow(self, body_bow_list):
         total_bow = dict()
@@ -55,10 +64,21 @@ class OnIssueEventTracking:
         total_cluster_bow = {k : (v / len(self.cluster_number_to_docs[cluster_number])) for k, v in self.get_total_bow(cluster_bow_list).items()}
         return total_cluster_bow
 
-    def on_issue_event_tracking(self, issue, body_bow_list, mode = "normal", num_events = 5, weight_on_original_issue = 0.75): # mode = "normal" or "consecutive"
+    def on_issue_event_tracking(self, issue, body_bow_list, method = "normal", num_events = 5, 
+    weight_on_original_issue = 0.8): # method = "normal" or "consecutive"
+        def time_to_timestamp(t):
+            return time.mktime(datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timetuple())
+
+        def get_average_timestamp_from_cluster_number(cluster_number):
+            result = 0
+            docs = self.cluster_number_to_docs[self.idx_to_cluster_number[cluster_number]]
+            for doc_id in docs:
+                result += time_to_timestamp(self.df["time"][doc_id])
+            return result / len(docs)
+
         on_issue_events = [] # index of each cluster
 
-        if mode == "normal":
+        if method == "normal":
             body_score_list = []
             for body_bow in body_bow_list:
                 body_score_list.append(self.information_retriever.score_document(issue, body_bow))
@@ -66,9 +86,9 @@ class OnIssueEventTracking:
 
             on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
             on_issue_events = [on_issue_event[0] for on_issue_event in on_issue_events]
-            on_issue_events = sorted(on_issue_events, key = lambda idx: self.df["time"][idx])
+            on_issue_events = sorted(on_issue_events, key = lambda idx: get_average_timestamp_from_cluster_number(idx))
 
-        else: # mode == "consecutive"
+        else: # method == "consecutive"
             while len(on_issue_events) < num_events:
                 if len(on_issue_events) == 0:
                     in_order_issue = issue
@@ -91,8 +111,8 @@ class OnIssueEventTracking:
 
                 in_order_event = None
                 for candidate_event in on_issue_event_candidates:
-                    if len(on_issue_events) == 0 or self.df["time"][candidate_event] > self.df["time"][on_issue_events[-1]]:
-                        if in_order_event == None or self.df["time"][candidate_event] < self.df["time"][in_order_event]:
+                    if len(on_issue_events) == 0 or get_average_timestamp_from_cluster_number(candidate_event) > get_average_timestamp_from_cluster_number(on_issue_events[-1]):
+                        if in_order_event == None or get_average_timestamp_from_cluster_number(candidate_event) < get_average_timestamp_from_cluster_number(in_order_event):
                             in_order_event = candidate_event
 
                 if in_order_event == None:
@@ -101,49 +121,130 @@ class OnIssueEventTracking:
                     on_issue_events.append(in_order_event)
         return on_issue_events
 
-    def get_detailed_info_dict_from_event_clusters(self, event_clusters):
-        # TODO: need to change self.df[idx, 0] (title) to event
-        # TODO: extract person, organization, place from document using NER or something
+    def get_detailed_info_list_from_event_clusters(self, event_clusters):
+        detailed_info_list = []
 
         for idx in event_clusters:
+            event_summary, person_list, organization_list, place_list = "", [], [], []
+
             docs = self.cluster_number_to_docs[self.idx_to_cluster_number[idx]]
-            print(docs)
+            random_doc = random.choice(docs) # TODO: consider another method
 
-        detailed_info = dict()
-        for idx in event_clusters:
-            detailed_info[self.df["title"][idx]] = dict({"person" : [], "organization" : [], "place" : []})
-        return detailed_info
+            # extract detailed information
+            event_summary = self.detailed_info_extractor.get_event_summary_from_doc_id(random_doc)
+            for doc_id in docs:
+                temp_person_list, temp_organization_list, temp_place_list = self.detailed_info_extractor.get_detailed_info_list_from_doc_id(doc_id)
 
-    def print_on_issue_event_tracking_result(self, issue, events, detailed_info):
-        events_str = " -> ".join(events)
-        cmd = f"[ Issue ]\n\n{issue}\n\n[ On-Issue Events ]\n\n{events_str}\n\n[ Detailed Information (per event) ]\n\n"
-        for event, info in detailed_info.items():
-            person = ", ".join(info["person"])
-            organization = ", ".join(info["organization"])
-            place = ", ".join(info["place"])
+                print(temp_person_list)
 
-            detailed_info_str = f"Event: {event}\n\n"
-            detailed_info_str += f"    -    Person: {person}\n"
-            detailed_info_str += f"    -    Organizaiton: {organization}\n"
-            detailed_info_str += f"    -    Place: {place}\n\n"
-            cmd += detailed_info_str
-        print(cmd)
+                person_list.extend(temp_person_list)
+                organization_list.extend(temp_organization_list)
+                place_list.extend(temp_place_list)
+
+            # remove redundant
+            person_list = list(set(person_list))
+            organization_list = list(set(organization_list))
+            place_list = list(set(place_list))
+
+            detailed_info_list.append((event_summary, person_list, organization_list, place_list))
+        return detailed_info_list
+
+    def print_on_issue_event_tracking_result(self, issue, detailed_info_list):
+        print(detailed_info_list)
+        events_str = " -> ".join([detailed_info[0] for detailed_info in detailed_info_list])
+        total_str = f"[ Issue ]\n\n{issue}\n\n[ On-Issue Events ]\n\n{events_str}\n\n[ Detailed Information (per event) ]\n\n"
+
+        for event_summary, person_list, organization_list, place_list in detailed_info_list:
+            person_str = ", ".join(person_list)
+            organization_str = ", ".join(organization_list)
+            place_str = ", ".join(place_list)
+
+            detailed_info_str = f"    Event: {event_summary}\n\n"
+            detailed_info_str += f"        -    Person: {person_str}\n"
+            detailed_info_str += f"        -    Organizaiton: {organization_str}\n"
+            detailed_info_str += f"        -    Place: {place_str}\n\n"
+            total_str += detailed_info_str
+        print(total_str)
 
 class DetailedInfoExtractor:
-    def __init__(self, df):
+    def __init__(self, df, config):
         self.df = df
+        self.method = config["detailed_info_extractor"]["method"]
+        self.summarizer = pipeline('summarization')
+        self.named_entity_recognizer = Ner(config["detailed_info_extractor"]["ner_model_dir"])
+        self.label_map = {
+            "1": "O", # None
+            "2": "B-MISC", # Begin of Artifact, Event, Natural Phenomenon
+            "3": "I-MISC", # Inside of Artifact, Event, Natural Phenomenon
+            "4": "B-PER", # Begin of Person
+            "5": "I-PER", # Inside of Person
+            "6": "B-ORG", # Begin of Organization
+            "7": "I-ORG", # Inside of Organization
+            "8": "B-LOC", # Begin of Geographical Entity
+            "9": "I-LOC", # Inside of Geographical Entity
+            "10": "[CLS]", # Special Classifcation Token
+            "11": "[SEP]" # Sentencec Pair Token
+        }
 
-    def get_event_summary_from_doc_id(doc_id):
-        return self.df["title"][doc_id]
+    def get_event_summary_from_doc_id(self, doc_id):
+        # print("self.method")
+        # print(self.method)
+        if self.method =="title":
+            return self.df["title"][doc_id]
+        elif self.method == "title_summary":
+            # print("summary")
+            # print(self.summarizer(self.df["title"][doc_id])[0]["summary_text"])
+            return self.summarizer(self.df["title"][doc_id])[0]["summary_text"]
+        elif self.method == "body_summary":
+            return self.summarizer(self.df["body"][doc_id])[0]["summary_text"]
 
-    def get_person_list_from_doc_id(doc_id):
-        return []
+    def get_detailed_info_list_from_doc_id(self, doc_id):
+        # TODO: consider only plausable token and emphasize proper noun
+        person_list, organization_list, place_list = [], [], []
+        for i, ner_dict in enumerate(self.named_entity_recognizer.predict(self.df["title"][doc_id])):
+            if ner_dict['tag'] in ["B-PER", "I-PER"]:
+                person_list.append((i, ner_dict['tag'], ner_dict['word']))
+            elif ner_dict['tag'] in ["B-ORG", "I-ORG"]:
+                organization_list.append((i, ner_dict['tag'], ner_dict['word']))
+            elif ner_dict['tag'] in ["B-LOC", "I-LOC"]:
+                place_list.append((i, ner_dict['tag'], ner_dict['word']))
 
-    def get_organization_list_from_doc_id(doc_id):
-        return []
+        # print("\n\n\n\n")
+        # print(person_list)
+        # print("\n\n")
+        # print(organization_list)
+        # print("\n\n")
+        # print(place_list)
+        # print("\n\n\n\n")
 
-    def get_place_list_from_doc_id(doc_id):
-        return []
+        return self.parse_detailed_info(person_list, "person"), self.parse_detailed_info(organization_list, "organization"), self.parse_detailed_info(place_list, "place")
+
+    def parse_detailed_info(self, detailed_info_list, info_type):
+        parsed_list = []
+        info_type_to_tokens = {
+            "person" : {"tag_start_token" : "B_PER", "tag_end_token" : "I-PER"},
+            "organization" : {"tag_start_token" : "B_ORG", "tag_end_token" : "I-ORG"},
+            "place" : {"tag_start_token" : "B-LOG", "tag_end_token" : "I-LOC"}
+        }
+
+        adjacency_idx = -2
+        cumulative_word = ""
+        for idx, tag, word in detailed_info_list:
+            if tag == info_type_to_tokens[info_type]["tag_start_token"]:
+                if cumulative_word != "":
+                    parsed_list.append(cumulative_word)
+                cumulative_word = word
+                adjacency_idx = idx
+            elif tag == info_type_to_tokens[info_type]["tag_end_token"] and idx == adjacency_idx + 1:
+                cumulative_word += " " + word
+                adjacency_idx = idx
+            elif tag == info_type_to_tokens[info_type]["tag_end_token"] and idx != adjacency_idx + 1:
+                if cumulative_word != "":
+                    parsed_list.append(cumulative_word)
+                cumulative_word = word
+        if cumulative_word != "":
+            parsed_list.append(cumulative_word)
+        return parsed_list
 
 class InformationRetrieval:
     def __init__(self, body_bow_list):
