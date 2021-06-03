@@ -2,13 +2,9 @@ argparse
 pandas
 nltk
 sklearn
-numpy
+numpy==1.20.2
 gensim
 python-Levenshtein
 torch
 tensorflow
 transformers
-bert
-
-sentencepiece==0.1.92
-pytorch-transformers

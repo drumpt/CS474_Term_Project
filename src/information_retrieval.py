@@ -13,6 +13,7 @@ from transformers import pipeline
 
 import preprocess
 from submodules.bert_ner.bert import Ner
+from nltk.tag import StanfordNERTagger
 
 class OnIssueEventTracking:
     def __init__(self, df, issue_list, config):
@@ -135,8 +136,6 @@ class OnIssueEventTracking:
             for doc_id in docs:
                 temp_person_list, temp_organization_list, temp_place_list = self.detailed_info_extractor.get_detailed_info_list_from_doc_id(doc_id)
 
-                print(temp_person_list)
-
                 person_list.extend(temp_person_list)
                 organization_list.extend(temp_organization_list)
                 place_list.extend(temp_place_list)
@@ -150,7 +149,6 @@ class OnIssueEventTracking:
         return detailed_info_list
 
     def print_on_issue_event_tracking_result(self, issue, detailed_info_list):
-        print(detailed_info_list)
         events_str = " -> ".join([detailed_info[0] for detailed_info in detailed_info_list])
         total_str = f"[ Issue ]\n\n{issue}\n\n[ On-Issue Events ]\n\n{events_str}\n\n[ Detailed Information (per event) ]\n\n"
 
@@ -169,55 +167,66 @@ class OnIssueEventTracking:
 class DetailedInfoExtractor:
     def __init__(self, df, config):
         self.df = df
-        self.method = config["detailed_info_extractor"]["method"]
-        self.summarizer = pipeline('summarization')
-        self.named_entity_recognizer = Ner(config["detailed_info_extractor"]["ner_model_dir"])
-        self.label_map = {
-            "1": "O", # None
-            "2": "B-MISC", # Begin of Artifact, Event, Natural Phenomenon
-            "3": "I-MISC", # Inside of Artifact, Event, Natural Phenomenon
-            "4": "B-PER", # Begin of Person
-            "5": "I-PER", # Inside of Person
-            "6": "B-ORG", # Begin of Organization
-            "7": "I-ORG", # Inside of Organization
-            "8": "B-LOC", # Begin of Geographical Entity
-            "9": "I-LOC", # Inside of Geographical Entity
-            "10": "[CLS]", # Special Classifcation Token
-            "11": "[SEP]" # Sentencec Pair Token
-        }
+        self.summary_method = config["detailed_info_extractor"]["summary_method"]
+        self.summarizer = pipeline('summarization') # TODO: consider another method too
+
+        self.ner_method = config["detailed_info_extractor"]["ner_method"]
+        if self.ner_method == "bert":
+            self.named_entity_recognizer = Ner(config["detailed_info_extractor"]["ner_model_dir"])
+            self.label_map = {
+                "1": "O", # None
+                "2": "B-MISC", # Begin of Artifact, Event, Natural Phenomenon
+                "3": "I-MISC", # Inside of Artifact, Event, Natural Phenomenon
+                "4": "B-PER", # Begin of Person
+                "5": "I-PER", # Inside of Person
+                "6": "B-ORG", # Begin of Organization
+                "7": "I-ORG", # Inside of Organization
+                "8": "B-LOC", # Begin of Geographical Entity
+                "9": "I-LOC", # Inside of Geographical Entity
+                "10": "[CLS]", # Special Classifcation Token
+                "11": "[SEP]" # Sentencec Pair Token
+            }
+        elif self.ner_method == "stanford":
+            self.named_entity_recognizer = StanfordNERTagger('english.all.3class.distsim.crf.ser.gz')
 
     def get_event_summary_from_doc_id(self, doc_id):
-        # print("self.method")
-        # print(self.method)
-        if self.method =="title":
+        if self.summary_method =="title":
             return self.df["title"][doc_id]
-        elif self.method == "title_summary":
+        elif self.summary_method == "title_summary":
             # print("summary")
             # print(self.summarizer(self.df["title"][doc_id])[0]["summary_text"])
             return self.summarizer(self.df["title"][doc_id])[0]["summary_text"]
-        elif self.method == "body_summary":
+        elif self.summary_method == "body_summary":
             return self.summarizer(self.df["body"][doc_id])[0]["summary_text"]
 
     def get_detailed_info_list_from_doc_id(self, doc_id):
         # TODO: consider only plausable token and emphasize proper noun
         person_list, organization_list, place_list = [], [], []
-        for i, ner_dict in enumerate(self.named_entity_recognizer.predict(self.df["title"][doc_id])):
-            if ner_dict['tag'] in ["B-PER", "I-PER"]:
-                person_list.append((i, ner_dict['tag'], ner_dict['word']))
-            elif ner_dict['tag'] in ["B-ORG", "I-ORG"]:
-                organization_list.append((i, ner_dict['tag'], ner_dict['word']))
-            elif ner_dict['tag'] in ["B-LOC", "I-LOC"]:
-                place_list.append((i, ner_dict['tag'], ner_dict['word']))
 
-        # print("\n\n\n\n")
-        # print(person_list)
-        # print("\n\n")
-        # print(organization_list)
-        # print("\n\n")
-        # print(place_list)
-        # print("\n\n\n\n")
+        if self.ner_method == "bert":
+            token_position = 0
+            for sentence in self.df["body"][doc_id].split("."):
+                for ner_dict in self.named_entity_recognizer.predict(sentence):
+                    print(ner_dict)
+                    if ner_dict['tag'] in ["B-PER", "I-PER"]:
+                        person_list.append((token_position, ner_dict['tag'], ner_dict['word']))
+                    elif ner_dict['tag'] in ["B-ORG", "I-ORG"]:
+                        organization_list.append((token_position, ner_dict['tag'], ner_dict['word']))
+                    elif ner_dict['tag'] in ["B-LOC", "I-LOC"]:
+                        place_list.append((token_position, ner_dict['tag'], ner_dict['word']))
+                    token_position += 1
+            return self.parse_detailed_info(person_list, "person"), self.parse_detailed_info(organization_list, "organization"), self.parse_detailed_info(place_list, "place")
 
-        return self.parse_detailed_info(person_list, "person"), self.parse_detailed_info(organization_list, "organization"), self.parse_detailed_info(place_list, "place")
+        elif self.ner_method == "stanford":
+            for token, tag in self.named_entity_recognizer.tag(self.df["body"][doc_id].split()):
+                if tag == "PERSON":
+                    person_list.append(token)
+                elif tag == "ORGANIZATION":
+                    organization_list.append(token)
+                elif tag == "LOCATION":
+                    place_list.append(token)
+            return person_list, organization_list, place_list
+
 
     def parse_detailed_info(self, detailed_info_list, info_type):
         parsed_list = []

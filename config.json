@@ -22,7 +22,8 @@
         "method": "consecutive"
     },
     "detailed_info_extractor": {
-        "method": "title",
+        "summary_method": "title",
+        "ner_method": "stanford",
         "ner_model_dir": "submodules/bert_ner/out_large"
     }
 }
