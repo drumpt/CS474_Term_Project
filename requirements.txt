@@ -8,3 +8,6 @@ python-Levenshtein
 torch
 tensorflow
 transformers
+spacy
+sentencepiece==0.1.92
+pytorch-transformers
