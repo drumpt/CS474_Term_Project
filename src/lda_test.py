@@ -18,13 +18,13 @@ class LDA:
         print("ROUND 2 - Encoding ended")
         self.topics, self.lda_model = self.train_lda(self.dict, self.corpus)
         print("ROUND 3 - Training LDA ended")
-        self.trend_find()
+        self.topic_dict = self.build_topic_dict()
+        self.merge_clustering()
 
     def pre_process(self, data_dir):
         jsons = utils.get_json_list_from_data_dir(data_dir)
         dfs_2015, dfs_2016, dfs_2017 = utils.get_dataframe_from_json_list_by_year(jsons)
-        # For fast check !
-        dfs_2015 = dfs_2015
+        dfs_2015 = dfs_2015[:200]
         Processor = preprocess.Preprocessor()
         tokenized_doc = dfs_2015["body"].apply(lambda x: Processor.preprocess(x))
         # stop_words = stopwords.words('english')
@@ -36,23 +36,27 @@ class LDA:
     def encoding(self, tokenized_doc):
         dictionary = corpora.Dictionary(tokenized_doc)
         corpus = [dictionary.doc2bow(text) for text in tokenized_doc]
+        # for i, c in enumerate(corpus):
+        #   print(f"{i}th corpus data is {c}")
+        #   if i>10:
+        #     break
         return dictionary, corpus
 
     def train_lda(self, dict, corpus):
-        lda_model = gensim.models.ldamodel.LdaModel(corpus, num_topics=self.num_trends, id2word=dict, passes=15)
-        topics = lda_model.print_topics(num_words=10)
-        # for t in topics:
-        #     print(t)
+        lda_model = gensim.models.ldamodel.LdaModel(corpus, num_topics=self.num_trends, id2word=dict, passes=50)
+        topics = lda_model.print_topics(num_words=5)
+        # for test in lda_model.get_topics():
+        #   print(len(test))
         return topics, lda_model
 
-    def trend_find(self):
+    def build_topic_dict(self):
         topic_dict = {}
         print("TOPIC DICT IS BUILDING")
-        # test_list = []
+        standard = 0.75
         for i, topic_list in enumerate(self.lda_model[self.corpus]):
-            # print("FOR CHECK")
-            # test_list.append(topic_list[0][1])
-            if topic_list[0][1] < 0.75:
+            topic_list = sorted(topic_list, key=lambda x: x[1], reverse=True)
+            if topic_list[0][1] < standard:
+                # print("It is smaller than standard")
                 continue
             if not topic_list[0][0] in topic_dict:
                 topic_dict[topic_list[0][0]] = [i]
@@ -62,26 +66,54 @@ class LDA:
                 topic_dict[topic_list[0][0]] = temp_list
         print("TOPIC DICT HAS BEEN BUILT")
 
-        # test_list.sort(reverse=True)
-        # cnt = 0
-        # standard = 0.9
-        # for tl in test_list:
-        #     if tl > standard:
-        #         cnt += 1
-        #     else:
-        #         print(f"Above {standard} are {cnt}")
-        #         cnt = 0
-        #         standard -= 0.1
-
-        for k in topic_dict:
-            print(f"{k}th topic can be seen as below:")
-            # bi = self.common_phrase(self.tokenized_doc[topic_dict[k]], 2)
-            tri = self.common_phrase(self.tokenized_doc[topic_dict[k]], 3)
-            # quad = self.common_phrase(self.tokenized_doc[topic_dict[k]], 4)
-            result_arr = [tri[0]]
-            result_arr.sort(key=lambda x:x[1], reverse=True)
-            print(f"Best ngram was {result_arr[0]}")
         return topic_dict
+
+    def merge_clustering(self):
+        lda_model = self.lda_model
+        topic_dict = self.topic_dict
+
+        for key in topic_dict:
+            print(f"{key}th num of data is {len(topic_dict[key])}")
+
+        info_mat = lda_model.get_topics()  # topic vector
+        while len(info_mat) > 10:
+            print(len(info_mat))
+            cos_mat = np.zeros((len(info_mat), len(info_mat)))
+            for i in range(len(info_mat)):
+                for j in range(len(info_mat)):
+                    if i == j:
+                        continue
+                    else:
+                        cos_mat[i][j] = cos_sim(info_mat[i], info_mat[j])
+            ind = np.unravel_index(np.argmax(cos_mat, axis=None), cos_mat.shape)
+            new_one = (info_mat[ind[0]] + info_mat[ind[1]]) / 2
+            del_index = [ind[0], ind[1]]
+
+            new_topic_dict = {}
+            for key in topic_dict:
+                if not key in del_index:
+                    new_topic_dict[len(new_topic_dict)] = topic_dict[key]
+            new_topic_dict[len(new_topic_dict)] = topic_dict[ind[0]] + topic_dict[ind[1]]
+
+            info_mat = np.delete(info_mat, del_index, axis=0)
+            print(f"Topic {ind[0]} and {ind[1]} are most similar!")
+            info_mat = np.concatenate((info_mat, [new_one]), axis=0)
+            topic_dict = new_topic_dict
+
+        for key in topic_dict:
+            print(f"{key}th num of data is {len(topic_dict[key])}")
+
+    # def trend_find(self):
+    # for k in topic_dict:
+    #     # Randomly sampling the other topics'
+    #     single = self.common_phrase(self.tokenized_doc[topic_dict[k]], 1)
+    #     bi = self.common_phrase(self.tokenized_doc[topic_dict[k]], 2)
+    #     tri = self.common_phrase(self.tokenized_doc[topic_dict[k]], 3)
+    #     quad = self.common_phrase(self.tokenized_doc[topic_dict[k]], 4)
+    #     result_arr = [single[0], bi[0], tri[0], quad[0]]
+    #     result_arr.sort(key=lambda x:x[1], reverse=True)
+    #     print(f"Best ngram was {result_arr[0]}")
+    # return topic_dict
 
     def common_phrase(self, text_list, phrase_length):
         a = time.time()
@@ -92,16 +124,14 @@ class LDA:
                 if n not in phrase_dict:
                     phrase_dict[n] = 0
                 for t_t in text_list:
-                    for i in range(len(t_t)-phrase_length+1):
-                        if t_t[i] == n[0] and t_t[i+1] == n[1]:
+                    for i in range(len(t_t) - phrase_length + 1):
+                        if t_t[i:i + phrase_length] == n[i:i + phrase_length]:
                             phrase_dict[n] += 1
         result = sorted(phrase_dict.items(), key=lambda x: x[1], reverse=True)
         b = time.time()
-        print(f"Function {phrase_length}-length common_phrase time : {b-a}")
+        print(f"Function {phrase_length}-length common_phrase time : {b - a}")
         return result[:5]
 
-    def get_topics(self):
-        return self.topics
 
 
 class LDA_scikit():
