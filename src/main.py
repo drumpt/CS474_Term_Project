@@ -26,6 +26,9 @@ def main(config):
     on_issue_event_tracker = information_retrieval.OnIssueEventTracking(clustered_df, issue_list, config)
     on_issue_event_tracker.apply_on_issue_event_tracking()
 
+    related_issue_event_tracker = information_retrieval.RelatedIssueEventTracking(clustered_df, issue_list, config)
+    related_issue_event_tracker.apply_related_issue_event_tracking()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_dir", type = str, required = False, default = "config.json")
