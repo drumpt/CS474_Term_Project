@@ -15,6 +15,153 @@ import preprocess
 from submodules.bert_ner.bert import Ner
 from nltk.tag import StanfordNERTagger
 
+
+
+class RelatedIssueEventTracking:
+    def __init__(self, df, issue_list, config):
+        self.df = df
+        self.issue_list = issue_list
+        self.config = config
+
+        self.preprocessor = preprocess.Preprocessor()
+        #self.detailed_info_extractor = DetailedInfoExtractor(df, config)
+
+        self.cluster_number_to_docs = {cluster_number : self.get_cluster_number_to_docs(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
+        self.cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
+        self.cluster_number_to_docs_and_avg_bow = sorted(self.cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
+
+        self.body_bow_list = [avg_bow for cluster_number, avg_bow in self.cluster_number_to_docs_and_avg_bow]
+        self.idx_to_cluster_number = [cluster_number for cluster_number, avg_bow in self.cluster_number_to_docs_and_avg_bow]
+        self.issue_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(issue)) for issue in issue_list]
+
+        self.information_retriever = InformationRetrieval(self.body_bow_list)
+
+    def apply_related_issue_event_tracking(self):
+        for i, issue in enumerate(self.issue_list):
+            related_issue_event_clusters = self.related_issue_event_tracking(issue, self.body_bow_list)
+            detailed_info = self.get_detailed_info_list_from_event_clusters(related_issue_event_clusters)
+            self.print_related_issue_event_tracking_result(self.issue_list[i], detailed_info)
+
+    def get_total_bow(self, body_bow_list):
+        total_bow = dict()
+        for body_bow in body_bow_list:
+            total_bow = dict(Counter(total_bow) + Counter(body_bow))
+        return total_bow
+
+    def get_bow_from_words(self, words):
+        bow = dict()
+        for word in words:
+            if bow.get(word):
+                bow[word] += 1
+            else:
+                bow[word] = 1
+        return bow
+
+    def get_cluster_number_to_docs(self, cluster_number):
+        return self.df[self.df["cluster_number"] == cluster_number]["id"].tolist()
+
+    def get_cluster_number_to_average_bow(self, cluster_number):
+        cluster_bow_list = []
+        for doc_id in self.cluster_number_to_docs[cluster_number]:
+            cluster_bow_list.append(self.get_bow_from_words(self.preprocessor.preprocess(self.df["body"][doc_id])))
+        total_cluster_bow = {k : (v / len(self.cluster_number_to_docs[cluster_number])) for k, v in self.get_total_bow(cluster_bow_list).items()}
+        return total_cluster_bow
+
+    def related_issue_event_tracking(self, issue, body_bow_list,  num_events = 4):
+        related_issue_events = [] # index of each cluster
+
+        body_score_list = []
+        issue_bow_subset_list = []
+        issue_word_list = self.preprocessor.preprocess(issue)
+
+        if len(issue_word_list) == 1:
+            issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list))
+        else:
+            if len(issue_word_list) % 2:
+                issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[:len(issue_word_list) // 2]))
+                issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[len(issue_word_list) // 2:]))
+                #issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[:len(issue_word_list) // 2 + 1]))
+                #issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[len(issue_word_list) // 2 + 1:]))
+            else:
+                issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[:len(issue_word_list) // 2]))
+                issue_bow_subset_list.append(self.get_bow_from_words(issue_word_list[len(issue_word_list) // 2:]))
+
+        related_issue_body_score_dict = dict()
+        for i, issue_bow in enumerate(issue_bow_subset_list):
+            related_issue_body_score_list = []
+            for body_bow in body_bow_list:
+                exists1 = False
+                for item in issue_bow_subset_list[i - 1].items():
+                    if item[0] in body_bow:
+                        exists1 = True
+                exists2 = True
+                for item in issue_bow.items():
+                    if not item[0] in body_bow:
+                        exists2 = False
+                if exists2 and not exists1:
+                    related_issue_body_score_list.append(self.information_retriever.score_document(issue_bow, body_bow))
+                else:
+                    related_issue_body_score_list.append(0)
+            for k, v in enumerate(related_issue_body_score_list):
+                if k in related_issue_body_score_dict:
+                    if related_issue_body_score_dict[k] > v:
+                        value = related_issue_body_score_dict[k]
+                    else:
+                        value = v
+                else:
+                    value = v * 1.2
+                related_issue_body_score_dict[k] = value
+
+        related_issue_events = sorted(related_issue_body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
+        related_issue_events = [related_issue_event[0] for related_issue_event in related_issue_events]
+        
+        return related_issue_events
+
+    def get_detailed_info_list_from_event_clusters(self, event_clusters):
+        detailed_info_list = []
+
+        for idx in event_clusters:
+            event_summary, person_list, organization_list, place_list = "", [], [], []
+
+            docs = self.cluster_number_to_docs[self.idx_to_cluster_number[idx]]
+            random_doc = random.choice(docs) # TODO: consider another method
+
+            # extract detailed information
+            event_summary = self.detailed_info_extractor.get_event_summary_from_doc_id(random_doc)
+            for doc_id in docs:
+                temp_person_list, temp_organization_list, temp_place_list = self.detailed_info_extractor.get_detailed_info_list_from_doc_id(doc_id)
+
+                person_list.extend(temp_person_list)
+                organization_list.extend(temp_organization_list)
+                place_list.extend(temp_place_list)
+
+            # remove redundant
+            person_list = list(set(person_list))
+            organization_list = list(set(organization_list))
+            place_list = list(set(place_list))
+
+            detailed_info_list.append((event_summary, person_list, organization_list, place_list))
+        return detailed_info_list
+
+    def print_related_issue_event_tracking_result(self, issue, detailed_info_list):
+        events_str = ", ".join([detailed_info[0] for detailed_info in detailed_info_list])
+        total_str = f"[ Issue ]\n\n{issue}\n\n[ Related-Issue Events ]\n\n{events_str}\n\n[ Detailed Information (per event) ]\n\n"
+
+        for event_summary, person_list, organization_list, place_list in detailed_info_list:
+            person_str = ", ".join(person_list)
+            organization_str = ", ".join(organization_list)
+            place_str = ", ".join(place_list)
+
+            detailed_info_str = f"    Event: {event_summary}\n\n"
+            detailed_info_str += f"        -    Person: {person_str}\n"
+            detailed_info_str += f"        -    Organizaiton: {organization_str}\n"
+            detailed_info_str += f"        -    Place: {place_str}\n\n"
+            total_str += detailed_info_str
+        print(total_str)
+
+
+
+
 class OnIssueEventTracking:
     def __init__(self, df, issue_list, config):
         self.df = df
