@@ -12,7 +12,7 @@
         "epoch": 50,
         "embedding_dim": 256,
         "output_dir": "weights",
-        "weight_dir": "weights/weights_049_0.0000.h5",
+        "weight_dir": "models/weights_049_0.0000.h5",
         "random_seed": 42
     },
     "clustering": {
@@ -23,7 +23,7 @@
     },
     "detailed_info_extractor": {
         "summary_method": "title",
-        "ner_method": "stanford",
+        "ner_method": "bert",
         "ner_model_dir": "submodules/bert_ner/out_large"
     }
 }

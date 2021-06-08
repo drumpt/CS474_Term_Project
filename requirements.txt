@@ -1,9 +1,10 @@
 argparse
+setuptools
 pandas
 nltk
 sklearn
-numpy==1.20.2
-gensim
+numpy==1.19.5
+gensim==4.0.1
 python-Levenshtein
 torch
 tensorflow
@@ -11,3 +12,4 @@ transformers
 spacy
 sentencepiece==0.1.92
 pytorch-transformers
+cython

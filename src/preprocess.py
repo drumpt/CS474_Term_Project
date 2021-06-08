@@ -52,6 +52,7 @@ class Preprocessor:
         Some words like 'a', 'an' are extremely common in English. Filter these words.
         '''
         stop_words = nltk.corpus.stopwords.words("english")
+        stop_words.append('Yonhap')
         return [word for word in words if not word in stop_words]
 
     def stemming(self, words):

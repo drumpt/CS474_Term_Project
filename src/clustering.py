@@ -17,8 +17,17 @@ class Vectorizer:
     def __init__(self, df, config):
         self.preprocessor = preprocess.Preprocessor()
         self.df = df
+
+        print("vectorizing 1")
+
         self.df["preprocessed_body"] = df["body"].apply(self.preprocessor.preprocess)
+
+        print("vectorizing 2")
+
         self.df["preprocessed_title"] = df["title"].apply(self.preprocessor.preprocess)
+
+        print("vectorizing 3")
+
         self.tagged_body = [TaggedDocument(words = row["preprocessed_body"], tags = [row["id"]]) for _, row in self.df.iterrows()]
         self.part_weight = config["doc2vec"]["part_weight"]
 

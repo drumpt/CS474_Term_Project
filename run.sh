@@ -1,4 +1,2 @@
-#!/bin/bash
-
-pip3 install -r requirements.txt
+pip3 install --no-cache-dir -q -r requirements.txt
 python3 src/main.py

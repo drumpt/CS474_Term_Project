@@ -8,12 +8,14 @@ from datetime import datetime
 import copy
 from collections import Counter
 
+import nltk
+nltk.download('averaged_perceptron_tagger')
 import numpy as np
 from transformers import pipeline
+from submodules.bert_ner.bert import Ner
+from nltk.tag import StanfordNERTagger, pos_tag
 
 import preprocess
-from submodules.bert_ner.bert import Ner
-from nltk.tag import StanfordNERTagger
 
 class OnIssueEventTracking:
     def __init__(self, df, issue_list, config):
@@ -157,10 +159,10 @@ class OnIssueEventTracking:
             organization_str = ", ".join(organization_list)
             place_str = ", ".join(place_list)
 
-            detailed_info_str = f"    Event: {event_summary}\n\n"
-            detailed_info_str += f"        -    Person: {person_str}\n"
-            detailed_info_str += f"        -    Organizaiton: {organization_str}\n"
-            detailed_info_str += f"        -    Place: {place_str}\n\n"
+            detailed_info_str = f"Event: {event_summary}\n\n"
+            detailed_info_str += f"    -    Person: {person_str}\n"
+            detailed_info_str += f"    -    Organizaiton: {organization_str}\n"
+            detailed_info_str += f"    -    Place: {place_str}\n\n"
             total_str += detailed_info_str
         print(total_str)
 
@@ -187,7 +189,12 @@ class DetailedInfoExtractor:
                 "11": "[SEP]" # Sentencec Pair Token
             }
         elif self.ner_method == "stanford":
-            self.named_entity_recognizer = StanfordNERTagger('english.all.3class.distsim.crf.ser.gz')
+            # self.named_entity_recognizer = StanfordNERTagger('english.all.3class.distsim.crf.ser.gz')
+            os.environ["CLASSPATH"] = "models"
+            os.environ["JAVAHOME"] = "/usr/bin/java"
+            self.named_entity_recognizer = StanfordNERTagger("models/stanford-ner.jar")
+
+        self.proper_noun_tagger = pos_tag
 
     def get_event_summary_from_doc_id(self, doc_id):
         if self.summary_method =="title":
@@ -205,7 +212,7 @@ class DetailedInfoExtractor:
 
         if self.ner_method == "bert":
             token_position = 0
-            for sentence in self.df["body"][doc_id].split("."):
+            for sentence in self.df["body"][doc_id].split(".")[:-1]: # remove last sentence regarding newspaper company
                 for ner_dict in self.named_entity_recognizer.predict(sentence):
                     print(ner_dict)
                     if ner_dict['tag'] in ["B-PER", "I-PER"]:
@@ -219,6 +226,7 @@ class DetailedInfoExtractor:
 
         elif self.ner_method == "stanford":
             for token, tag in self.named_entity_recognizer.tag(self.df["body"][doc_id].split()):
+                print(token)
                 if tag == "PERSON":
                     person_list.append(token)
                 elif tag == "ORGANIZATION":
@@ -227,14 +235,15 @@ class DetailedInfoExtractor:
                     place_list.append(token)
             return person_list, organization_list, place_list
 
-
     def parse_detailed_info(self, detailed_info_list, info_type):
         parsed_list = []
         info_type_to_tokens = {
-            "person" : {"tag_start_token" : "B_PER", "tag_end_token" : "I-PER"},
-            "organization" : {"tag_start_token" : "B_ORG", "tag_end_token" : "I-ORG"},
-            "place" : {"tag_start_token" : "B-LOG", "tag_end_token" : "I-LOC"}
+            "person" : {"tag_start_token" : "B-PER", "tag_end_token" : "I-PER"},
+            "organization" : {"tag_start_token" : "B-ORG", "tag_end_token" : "I-ORG"},
+            "place" : {"tag_start_token" : "B-LOC", "tag_end_token" : "I-LOC"}
         }
+
+        print(detailed_info_list)
 
         adjacency_idx = -2
         cumulative_word = ""
@@ -253,7 +262,27 @@ class DetailedInfoExtractor:
                 cumulative_word = word
         if cumulative_word != "":
             parsed_list.append(cumulative_word)
-        return parsed_list
+
+        return self.postprocess_detailed_info(parsed_list)
+
+    def postprocess_detailed_info(self, parsed_list):
+        parsed_list_to_remove = []
+
+        for i in range(len(parsed_list)):
+            for j in range(len(parsed_list)):
+                # remove proper substring
+                if i != j and parsed_list[i].lower() != parsed_list[j].lower() and parsed_list[i].lower() in parsed_list[j].lower():
+                    parsed_list_to_remove.append(parsed_list[i])
+
+        parsed_list = [word for word in parsed_list if word not in parsed_list_to_remove]
+
+        # POS Tag list : https://dbrang.tistory.com/1139
+        for word in parsed_list: # consider only proper nouns(NNP, NNPS)
+            tagged = self.proper_noun_tagger(word.split())
+            for word, tag in tagged:
+                print(word, tag)
+
+        return list(set(parsed_list))
 
 class InformationRetrieval:
     def __init__(self, body_bow_list):
