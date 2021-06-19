@@ -7,7 +7,7 @@ gensim
 python-Levenshtein
 torch
 tensorflow
-transformers
+transformers==2.11.0
 spacy
 sentencepiece==0.1.92
 pytorch-transformers
