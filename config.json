@@ -24,7 +24,7 @@
         "method": "hierarchical"
     },
     "on_issue_event_tracking": {
-        "method": "consecutive"
+        "method": "normal"
     },
     "detailed_info_extractor": {
         "summary_method": "title",

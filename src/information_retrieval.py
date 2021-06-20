@@ -96,25 +96,25 @@ class InformationRetrieval:
         else: # prob idf
             return max(0, math.log((len(self.body_bow_list) - df / df)))
 
-    # def score_document(self, query, document, mode = "tfidf"): # mode = "tfidf" or "bm25"
-    #     if self.norm(query) * self.norm(document) == 0:
-    #         return 0
+    def score_document(self, query, document, mode = "tfidf"): # mode = "tfidf" or "bm25"
+        if self.norm(query) * self.norm(document) == 0:
+            return 0
 
-    #     score = 0
-    #     terms = set(query.keys()) & set(document.keys())
-    #     for term in terms:
-    #         if mode == "tfidf":
-    #             score += self.tfidf(term, query) * self.tfidf(term, document)
-    #         else: # "bm25"
-    #             score += self.bm25(term, query) * self.bm25(term, document)
-    #     score /= self.norm(query) * self.norm(document)
-    #     return score
+        score = 0
+        terms = set(query.keys()) & set(document.keys())
+        for term in terms:
+            if mode == "tfidf":
+                score += self.tfidf(term, query) * self.tfidf(term, document)
+            else: # "bm25"
+                score += self.bm25(term, query) * self.bm25(term, document)
+        score /= self.norm(query) * self.norm(document)
+        return score
 
-    # def norm(self, document, mode = "c"):
-    #     if mode == "n":
-    #         return 1
-    #     elif mode == "c":
-    #         return np.linalg.norm(list(document.values()))
+    def norm(self, document, mode = "c"):
+        if mode == "n":
+            return 1
+        elif mode == "c":
+            return np.linalg.norm(list(document.values()))
 
 
 class OnIssueEventTracking:
@@ -128,19 +128,13 @@ class OnIssueEventTracking:
         self.detailed_info_extractor = DetailedInfoExtractor(df, config)
         self.ir = InformationRetrieval(df, inverted_index, config)
 
-        # self.cluster_number_to_docs = {cluster_number : self.get_cluster_number_to_docs(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
-        # self.cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
-        # self.cluster_number_to_docs_and_avg_bow = sorted(self.cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
-
-        # self.body_bow_list = [avg_bow for _, avg_bow in self.cluster_number_to_docs_and_avg_bow]
-        # self.idx_to_cluster_number = [cluster_number for cluster_number, _ in self.cluster_number_to_docs_and_avg_bow]
-        # self.issue_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(issue)) for issue in issue_list]
+        self.cluster_number_to_docs = {cluster_number : self.get_cluster_number_to_docs(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
 
     def apply_on_issue_event_tracking(self):
-        for i, issue in enumerate(self.issue_bow_list):
-            on_issue_event_clusters = self.on_issue_event_tracking(issue, self.body_bow_list, method = self.config["on_issue_event_tracking"]["method"])
+        for issue in self.issue_list:
+            on_issue_event_clusters = self.on_issue_event_tracking(issue, self.inverted_index, method = self.config["on_issue_event_tracking"]["method"])
             detailed_info = self.get_detailed_info_list_from_event_clusters(on_issue_event_clusters)
-            self.print_on_issue_event_tracking_result(self.issue_list[i], detailed_info)
+            self.print_on_issue_event_tracking_result(issue, detailed_info)
 
     def get_cluster_number_to_docs(self, cluster_number):
         return self.df[self.df["cluster_number"] == cluster_number]["id"].tolist()
@@ -152,14 +146,14 @@ class OnIssueEventTracking:
         total_cluster_bow = {k : (v / len(self.cluster_number_to_docs[cluster_number])) for k, v in self.get_total_bow(cluster_bow_list).items()}
         return total_cluster_bow
 
-    def on_issue_event_tracking(self, issue, body_bow_list, inverted_index, method = "normal", num_events = 5, 
+    def on_issue_event_tracking(self, issue, inverted_index, method = "normal", num_events = 5, 
     weight_on_original_issue = 0.8): # method = "normal" or "consecutive"
         def time_to_timestamp(t):
             return time.mktime(datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timetuple())
 
         def get_average_timestamp_from_cluster_number(cluster_number):
             result = 0
-            docs = self.cluster_number_to_docs[self.idx_to_cluster_number[cluster_number]]
+            docs = self.cluster_number_to_docs[cluster_number]
             for doc_id in docs:
                 result += time_to_timestamp(self.df["time"][doc_id])
             return result / len(docs)
@@ -169,8 +163,8 @@ class OnIssueEventTracking:
             candidate_cluster_numbers = set()
             for issue_token in issue_token_list:
                 for doc_id in inverted_index.get(issue_token):
-                    for row in self.df[self.df["id"] == doc_id].tolist():
-                        candidate_cluster_numbers.add(row["cluster_number"])
+                    for cluster_number in self.df[self.df["id"] == doc_id]["cluster_number"].tolist():
+                        candidate_cluster_numbers.add(cluster_number)
             return candidate_cluster_numbers
 
         def get_issue_tfidf_vector(issue):
@@ -199,8 +193,8 @@ class OnIssueEventTracking:
                     score = np.dot(issue_tfidf_vector, avg_tfidf_vector_for_cluster) / np.linalg.norm(issue_tfidf_vector) * np.linalg.norm(avg_tfidf_vector_for_cluster)
                 body_score_dict[cluster_number] = score
 
-            on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)
-            # on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
+            # on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)
+            on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
             on_issue_events = [on_issue_event[0] for on_issue_event in on_issue_events]
             on_issue_events = sorted(on_issue_events, key = lambda idx: get_average_timestamp_from_cluster_number(idx))
 
@@ -208,13 +202,16 @@ class OnIssueEventTracking:
             while len(on_issue_events) < num_events:
                 if len(on_issue_events) == 0:
                     in_order_issue_tfidf_vector = get_issue_tfidf_vector(issue)
+                    candidate_cluster_numbers = get_candidate_cluster_numbers(issue)
                 else:
                     original_issue_tfidf_vector = get_issue_tfidf_vector(issue)
                     temporary_issue_tfidf_vector = np.mean(np.array(self.df[self.df["cluster_number"] == on_issue_events[-1]]["tfidf_vector"]))
                     in_order_issue_tfidf_vector = weight_on_original_issue * original_issue_tfidf_vector + (1 - weight_on_original_issue) * temporary_issue_tfidf_vector
+                    candidate_cluster_numbers = get_candidate_cluster_numbers(issue)
+                    # candidate_cluster_numbers = get_candidate_cluster_numbers(concatenated_issue(issue, on_issue_events[-1]))
 
-                candidate_cluster_numbers = get_candidate_cluster_numbers(concatenated_issue(issue, on_issue_events[-1]))
-                body_score_dict = []
+
+                body_score_dict = dict()
                 for cluster_number in candidate_cluster_numbers:
                     avg_tfidf_vector_for_cluster = np.mean(np.array(self.df[self.df["cluster_number"] == cluster_number]["tfidf_vector"]))
                     if np.linalg.norm(in_order_issue_tfidf_vector) * np.linalg.norm(avg_tfidf_vector_for_cluster) == 0:
@@ -223,7 +220,7 @@ class OnIssueEventTracking:
                         score = np.dot(in_order_issue_tfidf_vector, avg_tfidf_vector_for_cluster) / np.linalg.norm(in_order_issue_tfidf_vector) * np.linalg.norm(avg_tfidf_vector_for_cluster)
                     body_score_dict[cluster_number] = score
 
-                on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)
+                on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:2 * num_events]
                 # on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
                 on_issue_event_candidates = [on_issue_event_candidate[0] for on_issue_event_candidate in on_issue_event_candidates]
 
@@ -243,10 +240,10 @@ class OnIssueEventTracking:
     def get_detailed_info_list_from_event_clusters(self, event_clusters):
         detailed_info_list = []
 
-        for idx in event_clusters:
+        for cluster_number in event_clusters:
             event_summary, person_list, organization_list, place_list = "", [], [], []
 
-            docs = self.cluster_number_to_docs[self.idx_to_cluster_number[idx]]
+            docs = self.cluster_number_to_docs[cluster_number]
             random_doc = random.choice(docs) # TODO: consider another method
 
             # extract detailed information
@@ -455,7 +452,7 @@ class DetailedInfoExtractor:
             token_position = 0
             for sentence in self.df["body"][doc_id].split("."):
                 for ner_dict in self.named_entity_recognizer.predict(sentence):
-                    print(ner_dict)
+                    # print(ner_dict)
                     if ner_dict['tag'] in ["B-PER", "I-PER"]:
                         person_list.append((token_position, ner_dict['tag'], ner_dict['word']))
                     elif ner_dict['tag'] in ["B-ORG", "I-ORG"]:

@@ -126,14 +126,14 @@ class Clustering:
 
     def apply_clustering(self):
         if self.method == "DBSCAN":
-            clusterizer = DBSCAN(eps = 0.1, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
+            clusterizer = DBSCAN(eps = 0.1, min_samples = 1).fit(self.df["vector"].tolist())
         elif self.method == "hierarchical":
-            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5, affinity = "cosine", linkage = 'single').fit(self.df["vector"].tolist())
+            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5).fit(self.df["vector"].tolist())
         elif self.method == "OPTICS":
-            clusterizer = OPTICS(eps = 0.1, min_samples = 2, metric = "cosine").fit(self.df["vector"].tolist())
+            clusterizer = OPTICS(eps = 0.1, min_samples = 2).fit(self.df["vector"].tolist())
         else:
             raise Exception(f"Invalid: {self.method}")
-        
+
         self.df["cluster_number"] = clusterizer.labels_
         return self.df
 
