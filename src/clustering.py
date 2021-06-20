@@ -2,6 +2,7 @@ import os
 import random
 import time
 from datetime import datetime
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -9,7 +10,8 @@ np.seterr(divide='ignore', invalid='ignore')
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.models.callbacks import CallbackAny2Vec
 
-from sklearn.cluster import DBSCAN, OPTICS, AgglomerativeClustering
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, OPTICS
+from sklearn import metrics
 
 import preprocess
 
@@ -96,42 +98,57 @@ class Callback(CallbackAny2Vec):
         self.epoch += 1
 
 
+class InvertedIndex:
+    def __init__(self, df, config):
+        self.df = df
+        self.output_dir = config["vectorize"]["inverted_index_dir"]
+        if not os.path.exists(os.path.dirname(self.output_dir)):
+            os.makedirs(os.path.dirname(self.output_dir))
+
+    def make_inverted_index(self):
+        inverted_index = dict()
+        for _, row in self.df.iterrows():
+            for word in row["preprocessed_body"]:
+                if inverted_index.get(word):
+                    if not row["id"] in inverted_index[word]:
+                        inverted_index[word].append(row["id"])
+                else:
+                    inverted_index[word] = [row["id"]]
+
+        with open(self.output_dir, "wb") as f:
+            pickle.dump(inverted_index, f)
+        print("Finish making inverted index!")
+        return inverted_index
+
+
 class Clustering:
     def __init__(self, df, config):
         self.df = df
         self.method = config["clustering"]["method"]
 
     def apply_clustering(self):
-
         if self.method == "DBSCAN":
-            # experiemnt
-            for i in np.arange(0.001, 1, 0.001):
-                clusterizer = DBSCAN(eps = i, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
-                print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
-            clusterizer = DBSCAN(eps = 0.1, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
-
+            clusterizer = DBSCAN(eps = 0.1, min_samples = 1).fit(self.df["vector"].tolist())
         elif self.method == "hierarchical":
-            # # experiemnt
-            # for i in np.arange(0.01, 100, 0.01):
-            #     clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = i).fit(self.df["vector"].tolist())
-            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
             clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5).fit(self.df["vector"].tolist())
-
         elif self.method == "OPTICS":
-            # # experiemnt
-            # for i in np.arange(1, 100):
-            #     clusterizer = OPTICS(eps = i, min_samples = 2).fit(self.df["vector"].tolist())
-            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
             clusterizer = OPTICS(eps = 0.1, min_samples = 2).fit(self.df["vector"].tolist())
         else:
-            raise Exception(f"Invalid: {self.weight_dir}")            
-        
+            raise Exception(f"Invalid: {self.method}")
+
         self.df["cluster_number"] = clusterizer.labels_
         return self.df
 
-    # TODO: need to evaluate various clustering algorithms
     def evaluate(self):
-        pass
+        # hard-coded class-label
+        class_number = [0, 1, 2, 3, 3, 4, 5, 6, 7, 5, 8, 9, 10, 11, 7, 12, 13, 14, 15, 7, 16, 13, 7, 17, 18, 13, 16, 19, 20, 17]
+        self.evaluated_df = self.df.head(30)
+
+        print(f"Rand index : {metrics.rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Adjusted rand index : {metrics.adjusted_rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Mutual information : {metrics.adjusted_mutual_info_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Homogeneity score : {metrics.homogeneity_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+
+
+class IssueFinder:
+    
