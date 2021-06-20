@@ -2,9 +2,10 @@ from abc import ABCMeta
 import logging
 
 import h5py
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
-from keras.models import load_model
-from keras.optimizers import SGD
+from tensorflow import keras
+from tensorflow.keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
+from tensorflow.keras.models import load_model
+from tensorflow.keras.optimizers import SGD
 import numpy as np
 
 
@@ -18,6 +19,7 @@ DEFAULT_NUM_EPOCHS = 250
 DEFAULT_STEPS_PER_EPOCH = 10000
 
 DOC_EMBEDDINGS_LAYER_NAME = 'doc_embeddings'
+SECTION_EMBEDDINGS_LAYER_NAME = 'section_embeddings'
 
 
 class Doc2VecModel(object):
@@ -37,6 +39,10 @@ class Doc2VecModel(object):
     @property
     def doc_embeddings(self):
         return _doc_embeddings_from_model(self._model)
+
+    @property
+    def section_embeddings(self):
+        return _section_embeddings_from_model(self._model)
 
     def build(self):
         raise NotImplementedError()
@@ -106,6 +112,12 @@ def _doc_embeddings_from_model(keras_model):
     for layer in keras_model.layers:
         if layer.get_config()['name'] == DOC_EMBEDDINGS_LAYER_NAME:
             return layer.get_weights()[0]
+
+def _section_embeddings_from_model(keras_model):
+    for layer in keras_model.layers:
+        if layer.get_config()['name'] == SECTION_EMBEDDINGS_LAYER_NAME:
+            return layer.get_weights()[0]
+
 
 
 def _write_doc_embeddings(doc_embeddings, path):

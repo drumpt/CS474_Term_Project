@@ -2,6 +2,7 @@ import os
 import random
 import time
 from datetime import datetime
+import pickle
 
 import pandas as pd
 import numpy as np
@@ -46,6 +47,7 @@ class Vectorizer:
             seed = config["doc2vec"]["random_seed"],
             compute_loss = True
         )
+        # self.model.init_sims(replace = True)
         self.model.build_vocab(self.tagged_body)
 
     def train(self):
@@ -70,9 +72,17 @@ class Vectorizer:
             x_list = []
             for i in range(len(x)):
                 try:
-                    x_list.append(list(x[i]))
+                    """print(x)
+                    print(x.iloc[i])
+                    print(type(x))"""
+                    x_list.append(list(x.iloc[i]))
                 except: # vectorized_time
-                    x_list.append(x[i])
+                    """print("except")
+                    print(x)
+                    print(x.iloc[i])
+                    print(type(x))
+                    print(type(x.iloc[i]))"""
+                    x_list.append(x.iloc[i])
             x = np.array(x_list, dtype = float)
             return (x - np.mean(x, axis = 0, keepdims = True)) / np.std(x, axis = 0, keepdims = True)
 
@@ -87,7 +97,18 @@ class Vectorizer:
             + self.part_weight["section"] * normalize(self.df["vectorized_section"])
         vectorized_time = np.expand_dims(normalize(self.df['vectorized_time']), axis = 1)
 
+        """print("Which one is the problem?")
+        print(normalize(self.df["vectorized_title"]))
+        print(normalize(self.df["vectorized_body"]))
+        print(normalize(self.df["vectorized_section"]))
+        print(vectorized_full_text)
+        print(vectorized_time)
+        print("shape")
+        print(vectorized_full_text.shape)
+        print(vectorized_time.shape)"""
+
         self.df["vector"] = pd.Series(np.concatenate((vectorized_full_text, vectorized_time), axis = 1).tolist())
+        #print(self.df["vector"])
         return self.df
 
 
@@ -103,6 +124,29 @@ class Callback(CallbackAny2Vec):
         model.save(os.path.join(self.output_dir, f"weights_{self.epoch:03d}_{loss:.4f}.h5"))
         print(f"Epoch : {self.epoch} loss : {loss}")
         self.epoch += 1
+
+
+class InvertedIndex:
+    def __init__(self, df, config):
+        self.df = df
+        self.output_dir = config["vectorize"]["inverted_index_dir"]
+        if not os.path.exists(os.path.dirname(self.output_dir)):
+            os.makedirs(os.path.dirname(self.output_dir))
+
+    def make_inverted_index(self):
+        inverted_index = dict()
+        for _, row in self.df.iterrows():
+            for word in row["preprocessed_body"]:
+                if inverted_index.get(word):
+                    if not row["id"] in inverted_index[word]:
+                        inverted_index[word].append(row["id"])
+                else:
+                    inverted_index[word] = [row["id"]]
+
+        with open(self.output_dir, "wb") as f:
+            pickle.dump(inverted_index, f)
+        print("Finish making inverted index!")
+        return inverted_index
 
 
 class Clustering:

@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"  # or if you want more than 1 GPU set it as "0", "1"
+
 import argparse
 import itertools
 
@@ -7,6 +10,8 @@ from doc2vec import vocab
 
 import json
 import pandas
+
+import tensorflow as tf
 
 
 MODEL_TYPES = {
@@ -116,48 +121,53 @@ def main():
 
     model_class, data_generator, batcher = MODEL_TYPES[args.model]
 
-    m = model_class(args.window_size, v.size, num_docs,
-                    embedding_size=args.embedding_size)
+    with tf.device('/GPU:0'):
+        m = model_class(args.window_size, v.size, num_docs,
+                        embedding_size=args.embedding_size)
 
-    if args.load:
-        m.load(args.load) 
-    else:
-        m.build()
-        m.compile()
-
-    elapsed_epochs = 0
-
-    if args.train:
-        if args.model == "dmsec": 
-            section_ids_by_doc_id = sections_by_id(args.path, args.json_num)
-            all_data = batcher(
-                    data_generator(
-                        token_ids_by_doc_id,
-                        args.window_size,
-                        v.size, section_ids_by_doc_id))
+        if args.load:
+            m.load(args.load) 
         else:
-            all_data = batcher(
-                    data_generator(
-                        token_ids_by_doc_id,
-                        args.window_size,
-                        v.size))
+            m.build()
+            m.compile()
 
-        history = m.train(
-                all_data,
-                epochs=args.num_epochs,
-                steps_per_epoch=args.steps_per_epoch,
-                early_stopping_patience=args.early_stopping_patience,
-                save_path=args.save,
-                save_period=args.save_period,
-                save_doc_embeddings_path=args.save_doc_embeddings,
-                save_doc_embeddings_period=args.save_doc_embeddings_period)
+        elapsed_epochs = 0
 
-        elapsed_epochs = len(history.history['loss'])
+        if args.train:
+            if args.model == "dmsec": 
+                section_ids_by_doc_id = sections_by_id(args.path, args.json_num)
+                print(len(token_ids_by_doc_id))
+                print(token_ids_by_doc_id[0])
+                print(len(section_ids_by_doc_id))
+                print(section_ids_by_doc_id[0])
+                all_data = batcher(
+                        data_generator(
+                            token_ids_by_doc_id,
+                            args.window_size,
+                            v.size, section_ids_by_doc_id))
+            else:
+                all_data = batcher(
+                        data_generator(
+                            token_ids_by_doc_id,
+                            args.window_size,
+                            v.size))
 
-    if args.save:
-        m.save(
-            args.save.format(epoch=elapsed_epochs))
+            history = m.train(
+                    all_data,
+                    epochs=args.num_epochs,
+                    steps_per_epoch=args.steps_per_epoch,
+                    early_stopping_patience=args.early_stopping_patience,
+                    save_path=args.save,
+                    save_period=args.save_period,
+                    save_doc_embeddings_path=args.save_doc_embeddings,
+                    save_doc_embeddings_period=args.save_doc_embeddings_period)
 
-    if args.save_doc_embeddings:
-        m.save_doc_embeddings(
-            args.save_doc_embeddings.format(epoch=elapsed_epochs))
+            elapsed_epochs = len(history.history['loss'])
+
+        if args.save:
+            m.save(
+                args.save.format(epoch=elapsed_epochs))
+
+        if args.save_doc_embeddings:
+            m.save_doc_embeddings(
+                args.save_doc_embeddings.format(epoch=elapsed_epochs))

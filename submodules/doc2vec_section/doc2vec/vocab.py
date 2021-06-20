@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 DEFAULT_SIZE = 10000
-DEFAULT_RARE_THRESHOLD = 0
+DEFAULT_RARE_THRESHOLD = 2
 
 
 _UNKNOWN = '<unk>'

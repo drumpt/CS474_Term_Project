@@ -1,12 +1,18 @@
 import gensim
 import preprocess
 from gensim import corpora
+from gensim.models.coherencemodel import CoherenceModel
 from nltk.corpus import stopwords
 from nltk.util import ngrams
 import utils
 import time
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
+import numpy as np
+
+
+def cos_sim(A, B):
+    return np.dot(A, B)/(np.linalg.norm(A)*np.linalg.norm(B))
 
 
 class LDA:
@@ -18,13 +24,37 @@ class LDA:
         print("ROUND 2 - Encoding ended")
         self.topics, self.lda_model = self.train_lda(self.dict, self.corpus)
         print("ROUND 3 - Training LDA ended")
-        self.trend_find()
+        self.topic_dict = self.build_topic_dict()
+        print("ROUND 4 - Building topic_dict ended")
+        self.merge_dict = self.merge_clustering()
+        print("ROUND 5 - Merging dict ended")
+        dict_list = self.merge_dict.items()
+        self.temp_list = sorted(dict_list, key=lambda x: len(x[1]), reverse=True)
+        target = []
+        for i in range(10):
+            target.append(self.temp_list[i][1])
+        
+        for (i, doc_i) in enumerate(target):
+            A = self.tokenized_doc[doc_i]
+            B = []
+            for (j, doc_j) in enumerate(target):
+                if i==j:
+                    continue
+                else:
+                    for d in self.tokenized_doc[doc_j]:
+                        B.append(d)
+            result_1, result_2, result_3 = self.common_phrase(A, B, 2)
+            result_3 = sorted(list(result_3.items()), key=lambda x: x[1], reverse = True)
+            print(result_3)
+        
+        # print(self.topic_dict)
+        #self.trend_find()
 
     def pre_process(self, data_dir):
         jsons = utils.get_json_list_from_data_dir(data_dir)
         dfs_2015, dfs_2016, dfs_2017 = utils.get_dataframe_from_json_list_by_year(jsons)
         # For fast check !
-        dfs_2015 = dfs_2015
+        # dfs_2015 = dfs_2015
         Processor = preprocess.Preprocessor()
         tokenized_doc = dfs_2015["body"].apply(lambda x: Processor.preprocess(x))
         # stop_words = stopwords.words('english')
@@ -39,12 +69,134 @@ class LDA:
         return dictionary, corpus
 
     def train_lda(self, dict, corpus):
-        lda_model = gensim.models.ldamodel.LdaModel(corpus, num_topics=self.num_trends, id2word=dict, passes=15)
+        lda_model = gensim.models.ldamodel.LdaModel(corpus, num_topics=self.num_trends, id2word=dict, passes=30)
         topics = lda_model.print_topics(num_words=10)
-        # for t in topics:
-        #     print(t)
+        cm = CoherenceModel(model = lda_model, texts = self.tokenized_doc, dictionary=dict, coherence='c_v')
+        coherence = cm.get_coherence()
+        print("Coherence", coherence)
+        print("Perplexity", lda_model.log_perplexity(corpus))
+        
         return topics, lda_model
 
+    def build_topic_dict(self):
+        topic_dict = {}
+
+        for i in range(self.num_trends):
+          topic_dict[i]=[]
+        # print(topic_dict.keys())
+        # print("TOPIC DICT IS BUILDING")
+        standard = 0.75
+        for i, topic_list in enumerate(self.lda_model[self.corpus]):
+          topic_list = sorted(topic_list, key=lambda x: x[1], reverse=True)
+          # if topic_list[0][1] < standard:
+            # print("It is smaller than standard")
+            # continue
+          if len(topic_list) == 0:
+            continue
+          temp_list = topic_dict[topic_list[0][0]]
+          temp_list.append(i)
+          topic_dict[topic_list[0][0]] = temp_list
+        print("TOPIC DICT HAS BEEN BUILT")
+
+        return topic_dict    
+
+    def merge_clustering(self):
+      lda_model = self.lda_model
+      topic_dict = self.topic_dict
+
+      # for key in topic_dict:
+      #   print(f"{key}th num of data is {len(topic_dict[key])}")
+
+      info_mat = lda_model.get_topics() # topic vector
+      # print(info_mat[0])
+      while len(info_mat) > 10:
+        # print(len(info_mat))
+        cos_mat = np.zeros((len(info_mat), len(info_mat)))
+        for i in range(len(info_mat)):
+          for j in range(len(info_mat)):
+            if i==j:
+              continue
+            else:
+              cos_mat[i][j] = cos_sim(info_mat[i], info_mat[j])
+        ind = np.unravel_index(np.argmax(cos_mat, axis=None), cos_mat.shape)
+        new_one = (info_mat[ind[0]] + info_mat[ind[1]]) / 2
+        del_index = [ind[0], ind[1]]
+        # print(topic_dict.keys())
+        # print(del_index)
+        new_topic_dict = {}
+        for key in topic_dict:
+          if not key in del_index:
+            new_topic_dict[len(new_topic_dict)] = topic_dict[key]
+        new_topic_dict[len(new_topic_dict)] = topic_dict[ind[0]] + topic_dict[ind[1]]
+
+        info_mat = np.delete(info_mat, del_index, axis=0)
+        info_mat = np.concatenate((info_mat, [new_one]), axis=0)
+        topic_dict = new_topic_dict
+
+      # for key in topic_dict:
+      #   print(f"{key}th num of data is {len(topic_dict[key])}")
+      return topic_dict
+
+
+    def trend_find(self):
+      for key in self.merge_dict:
+        A = self.tokenized_doc[self.merge_dict[key]]
+        B = []
+        for a_key in self.merge_dict:
+          if key == a_key:
+            continue
+          else:
+            for d in self.tokenized_doc[self.merge_dict[a_key]]:
+              B.append(d)
+        print(f"{key}th Topic Important Bigram is")
+        result, result_2, result_3 = self.common_phrase(A, B, 2)
+        result_3 = sorted(list(result_3.items()), key=lambda x: x[1], reverse=True)
+        print(result_3)
+
+    def common_phrase(self, text_list, untext_list, phrase_length):
+      phrase_dict = {}
+      cnt_n = 0
+      for (i, t) in enumerate(text_list):
+        ngram = ngrams(t, phrase_length)
+        # cnt_n += len(ngram)
+        for n in ngram:
+          cnt_n += 1  
+          n = tuple(n)
+          if n not in phrase_dict:
+            phrase_dict[n] = 0
+          for (j, t_t) in enumerate(text_list):
+            if i == j:
+              continue
+            mgram = ngrams(t_t, phrase_length)
+            for m in mgram:
+              m = tuple(m)
+              if n == m:
+                phrase_dict[n] += 1
+
+      anti_phrase_dict = {}
+      for key in phrase_dict:
+        anti_phrase_dict[key] = 1
+      for (k, t) in enumerate(untext_list):
+        ngram = ngrams(t, phrase_length)
+        for n in ngram:
+          n = tuple(n)
+          if n in anti_phrase_dict:
+            anti_phrase_dict[n] += 1
+            continue
+
+      final_dict = {}
+      N = len(text_list) + len(untext_list)
+      for key in phrase_dict:
+        tf = phrase_dict[key] / cnt_n
+        df = anti_phrase_dict[key]
+        idf = N / df
+        idf = np.log10(idf)
+        final_dict[key] = tf * idf
+
+      return phrase_dict, anti_phrase_dict, final_dict
+
+
+"""
     def trend_find(self):
         topic_dict = {}
         print("TOPIC DICT IS BUILDING")
@@ -99,9 +251,7 @@ class LDA:
         b = time.time()
         print(f"Function {phrase_length}-length common_phrase time : {b-a}")
         return result[:5]
-
-    def get_topics(self):
-        return self.topics
+"""
 
 
 class LDA_scikit():
@@ -146,5 +296,5 @@ class LDA_scikit():
 
 
 if __name__ == "__main__":
-    # lda_class = LDA("../dataset", 10)
-    lda_scikit = LDA_scikit("../dataset", 30)
+    lda_class = LDA("../dataset", 100)
+    # lda_scikit = LDA_scikit("../dataset", 30)

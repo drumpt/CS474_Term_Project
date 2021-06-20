@@ -1,5 +1,5 @@
 {
-    "data_dir": "sample_dataset",
+    "data_dir": "dataset",
     "lda": {
         "num_trends": 10
     },
@@ -9,20 +9,26 @@
             "body": 1,
             "section": 0
         },
-        "epoch": 50,
+        "epoch": 30,
         "embedding_dim": 256,
         "output_dir": "weights",
         "weight_dir": "models/weights_049_0.0000.h5",
         "random_seed": 42
     },
+    "vectorize": {
+        "recalculation": true,
+        "final_dataframe_dir": "output/final_dataframe.pickle",
+        "inverted_index_dir": "output/invered_index.pickle"
+    },
     "clustering": {
         "method": "hierarchical"
     },
     "on_issue_event_tracking": {
-        "method": "consecutive"
+        "method": "normal"
     },
     "detailed_info_extractor": {
-        "summary_method": "title",
+        "summary_method": "transformer",
+        "summary_target": "title",
         "ner_method": "bert",
         "ner_model_dir": "submodules/bert_ner/out_large"
     }

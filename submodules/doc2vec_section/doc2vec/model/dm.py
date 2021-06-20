@@ -1,5 +1,5 @@
-from keras.layers import Average, Concatenate, Dense, Embedding, Input, Lambda
-from keras.models import Model
+from tensorflow.keras.layers import Average, Concatenate, Dense, Embedding, Input, Lambda
+from tensorflow.keras.models import Model
 import tensorflow as tf
 
 from doc2vec.model import lambdas, model

@@ -1,5 +1,5 @@
-from keras.layers import Average, Concatenate, Dense, Embedding, Input, Lambda
-from keras.models import Model
+from tensorflow.keras.layers import Average, Concatenate, Dense, Embedding, Input, Lambda
+from tensorflow.keras.models import Model
 import tensorflow as tf
 
 from doc2vec.model import lambdas, model
@@ -21,7 +21,8 @@ class DMSEC(model.Doc2VecModel):
                                  name=model.DOC_EMBEDDINGS_LAYER_NAME)(doc_input)
         embedded_section = Embedding(input_dim=12,
                                  output_dim=self._embedding_size,
-                                 input_length=1)(section_input)
+                                 input_length=1,
+                                 name=model.SECTION_EMBEDDINGS_LAYER_NAME)(section_input)
       
         embedded = Concatenate(axis=1)([embedded_doc, embedded_section, embedded_sequence])
         split = Lambda(lambdas.split(self._window_size + 1))(embedded)
