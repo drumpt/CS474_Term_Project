@@ -104,9 +104,9 @@ class InformationRetrieval:
         terms = set(query.keys()) & set(document.keys())
         for term in terms:
             if mode == "tfidf":
-                score += self.tfidf(term, query) * self.tfidf(term, document)
+                score += self.tfidf(term, query, self.inverted_index) * self.tfidf(term, document, self.inverted_index)
             else: # "bm25"
-                score += self.bm25(term, query) * self.bm25(term, document)
+                score += self.bm25(term, query, self.inverted_index) * self.bm25(term, document, self.inverted_index)
         score /= self.norm(query) * self.norm(document)
         return score
 
@@ -288,17 +288,32 @@ class RelatedIssueEventTracking:
         self.config = config
 
         self.preprocessor = preprocess.Preprocessor()
-        #self.detailed_info_extractor = DetailedInfoExtractor(df, config)
+        self.detailed_info_extractor = DetailedInfoExtractor(df, config)
 
         self.cluster_number_to_docs = {cluster_number : self.get_cluster_number_to_docs(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
         self.cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number) for cluster_number in set(df["cluster_number"].tolist())}
         self.cluster_number_to_docs_and_avg_bow = sorted(self.cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
 
-        self.body_bow_list = [avg_bow for cluster_number, avg_bow in self.cluster_number_to_docs_and_avg_bow]
+        self.body_bow_list = [avg_bow for _, avg_bow in self.cluster_number_to_docs_and_avg_bow]
         self.idx_to_cluster_number = [cluster_number for cluster_number, avg_bow in self.cluster_number_to_docs_and_avg_bow]
         self.issue_bow_list = [self.get_bow_from_words(self.preprocessor.preprocess(issue)) for issue in issue_list]
 
-        self.information_retriever = InformationRetrieval(self.body_bow_list)
+        self.information_retriever = InformationRetrieval(self.df, inverted_index, config)
+
+    def get_bow_from_words(self, words):
+        bow = dict()
+        for word in words:
+            if bow.get(word):
+                bow[word] += 1
+            else:
+                bow[word] = 1
+        return bow
+
+    def get_total_bow(self, body_bow_list):
+        total_bow = dict()
+        for body_bow in body_bow_list:
+            total_bow = dict(Counter(total_bow) + Counter(body_bow))
+        return total_bow
 
     def apply_related_issue_event_tracking(self):
         for i, issue in enumerate(self.issue_list):

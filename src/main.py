@@ -34,9 +34,12 @@ def main(config):
                 inverted_index = pickle.load(f)
 
     issue_list = ['North Korea Nuclear Test', 'Pyeongchang Olympic'] # hard-coded issues
-    event_tracker = information_retrieval.EventTracker(final_df, inverted_index, issue_list, config)
-    event_tracker.apply_on_issue_event_tracking()
-    event_tracker.apply_related_issue_event_tracking()
+
+    on_issue_event_tracker = information_retrieval.OnIssueEventTracking(final_df, inverted_index, issue_list, config)
+    on_issue_event_tracker.apply_on_issue_event_tracking()
+
+    related_issue_event_tracker = information_retrieval.RelatedIssueEventTracking(final_df, inverted_index, issue_list, config)
+    related_issue_event_tracker.apply_related_issue_event_tracking()
 
 
 if __name__ == '__main__':
