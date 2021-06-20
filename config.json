@@ -1,5 +1,5 @@
 {
-    "data_dir": "sample_dataset",
+    "data_dir": "dataset",
     "lda": {
         "num_trends": 10
     },
@@ -24,7 +24,7 @@
         "method": "hierarchical"
     },
     "on_issue_event_tracking": {
-        "method": "normal"
+        "method": "consecutive"
     },
     "detailed_info_extractor": {
         "summary_method": "title",

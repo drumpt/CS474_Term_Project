@@ -11,6 +11,7 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.models.callbacks import CallbackAny2Vec
 
 from sklearn.cluster import DBSCAN, AgglomerativeClustering, OPTICS
+from sklearn import metrics
 
 import preprocess
 
@@ -119,6 +120,7 @@ class InvertedIndex:
         print("Finish making inverted index!")
         return inverted_index
 
+
 class Clustering:
     def __init__(self, df, config):
         self.df = df
@@ -137,9 +139,16 @@ class Clustering:
         self.df["cluster_number"] = clusterizer.labels_
         return self.df
 
-    # TODO: need to evaluate various clustering algorithms
     def evaluate(self):
-        pass
+        # hard-coded class-label
+        class_number = [0, 1, 2, 3, 3, 4, 5, 6, 7, 5, 8, 9, 10, 11, 7, 12, 13, 14, 15, 7, 16, 13, 7, 17, 18, 13, 16, 19, 20, 17]
+        self.evaluated_df = self.df.head(30)
 
-    def visualize(self):
-        pass
+        print(f"Rand index : {metrics.rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Adjusted rand index : {metrics.adjusted_rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Mutual information : {metrics.adjusted_mutual_info_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Homogeneity score : {metrics.homogeneity_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+
+
+class IssueFinder:
+    

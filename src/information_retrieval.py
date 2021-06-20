@@ -56,8 +56,9 @@ class InformationRetrieval:
 
         self.df["tfidf_vector"] = tfidf_vector_list
         with open(self.output_dir, "wb") as f:
-            pickle.dump(self.df, f)
-        return self.df
+            pickle.dump(self.df[["title", "time", "description", "body", "section", "id", "preprocessed_body", "cluster_number", "tfidf_vector"]], f)
+
+        return self.df[["title", "time", "description", "body", "section", "id", "preprocessed_body", "cluster_number", "tfidf_vector"]]
 
     def tfidf(self, term, document, inverted_index):
         return self.tf(term, document) * self.idf(term, document, inverted_index)
