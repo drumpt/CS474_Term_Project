@@ -15,7 +15,7 @@ Text mining is an area where various analytical methods and approaches are being
 - Data Size : 23769 news
 - Data Format : json
 
-## Description
+## :scroll: Description
 
 ### Issue Trend Analysis
 This task is to find the top ten most significant issues for each year and rank them, from the news articles over the period of three years. It can be seen as a task for Topic Modeling, and LDA is known as the most common algorithm in Topic Modeling. Therefore, we intend to apply LDA as well as other algorithms to compare performance and use it to create the most optimal scoring function or criteria. 
