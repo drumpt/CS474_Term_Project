@@ -109,6 +109,141 @@ class InformationRetrieval:
             return max(0, math.log((len(self.body_bow_list) - df / df)))
 
 
+class InformationRetrieval2:
+    """def __init__(self, body_bow_list):
+        self.body_bow_list = body_bow_list"""
+    def __init__(self, df, inverted_index, config):
+        self.df = df
+        self.inverted_index = inverted_index
+        self.body_bow_list = [self.get_bow_from_words(words)  for _, words in self.df["preprocessed_body"].iteritems()]
+        self.total_bow =  self.get_total_bow(self.body_bow_list)
+        self.sorted_words = sorted(self.total_bow.keys())
+        self.output_dir = config["vectorize"]["final_dataframe_dir"]
+
+    def get_bow_from_words(self, words):
+        bow = dict()
+        for word in words:
+            if bow.get(word):
+                bow[word] += 1
+            else:
+                bow[word] = 1
+        return bow
+
+    def get_total_bow(self, body_bow_list):
+        total_bow = dict()
+        for body_bow in body_bow_list:
+            total_bow = dict(Counter(total_bow) + Counter(body_bow))
+        return total_bow
+
+    def get_tfidf_vector_list(self, mode = "bm25"):
+        tfidf_vector_list = []
+        vector_length = len(self.sorted_words)
+
+        for body_bow in self.body_bow_list:
+            tfidf_vector = np.zeros(vector_length)
+            for word in body_bow.keys():
+                if mode == "tfidf":
+                    tfidf_vector[self.sorted_words.index(word)] = self.tfidf(word, body_bow, self.inverted_index)
+                else: # "bm25"
+                    tfidf_vector[self.sorted_words.index(word)] = self.bm25(word, body_bow, self.inverted_index)
+            tfidf_vector_list.append(tfidf_vector)
+
+        self.df["tfidf_vector"] = tfidf_vector_list
+        # with open(self.output_dir, "wb") as f:
+        #     pickle.dump(self.df, f)
+        return self.df
+
+    def score_document(self, query, document, mode = "tfidf", ngram_body_bow_list=None): # mode = "tfidf" or "bm25"
+        if self.norm(query) * self.norm(document) == 0:
+            return 0
+        if ngram_body_bow_list:
+            self.ngram_body_bow_list = ngram_body_bow_list
+            self.ngram = True
+        else:
+            self.ngram = False
+
+        score = 0
+        terms = set(query.keys()) & set(document.keys())
+        for term in terms:
+            if mode == "tfidf":
+                score += self.tfidf(term, query) * self.tfidf(term, document)
+            else: # "bm25"
+                score += self.bm25(term, query) * self.bm25(term, document)
+        score /= self.norm(query) * self.norm(document)
+        return score
+
+    def bm25(self, term, document, inverted_index):
+        k1, b, N = 2.0, 0.75, len(self.body_bow_list)
+
+        if not inverted_index.get(term):
+            n = 0
+        else:
+            n = len(set(inverted_index[term]).intersection(self.df['id'].tolist()))
+
+        doc_length = np.sum(list(document.values()))
+        avg_doc_length = np.mean([np.sum(list(body_bow.values())) for body_bow in self.body_bow_list])
+
+        denom = k1 * ((1- b) + (b * doc_length / avg_doc_length)) + self.tf(term, document)
+        return self.tf(term, document) / denom * math.log((N - n + 0.5) / (n + 0.5))
+
+    def tfidf(self, term, document):
+        return self.tf(term, document) * self.idf(term, document, self.inverted_index)
+    
+    def tf(self, term, document, mode = "l"):
+        if document[term] == 0:
+            return 0
+
+        if mode == "n":
+            return document[term]
+        elif mode == "l":
+            return 1 + math.log(document[term])
+        elif mode == "a":
+            return 0.5 + (0.5 * document[term]) / max(document.values())
+        else: # log ave
+            return (1 + math.log(document[term])) / (1 + math.log(sum(document.values()) / len(document.values())))
+
+    def idf(self, term, document, inverted_index, mode = "t"):
+        if document[term] == 0:
+            return 0
+
+        """df = 0 # document frequency
+        if self.ngram_body_bow_list:
+            for body_bow in self.ngram_body_bow_list:
+                if body_bow.get(term):
+                    df += 1
+        else:
+            for body_bow in self.body_bow_list:
+                if body_bow.get(term):
+                    df += 1"""
+        if self.ngram:
+            df = 0
+            for body_bow in self.ngram_body_bow_list.items():
+                try:
+                    if body_bow[1].get(term):
+                        df += 1
+                except:
+                    pass
+        else:
+            df = len(set(inverted_index[term]).intersection(self.df['id'].tolist()))
+
+        if mode == "n":
+            return 1
+        elif mode == "t":
+            if self.ngram:
+                return math.log(len(self.ngram_body_bow_list) / df)
+            return math.log(len(self.body_bow_list) / df)
+        else: # prob idf
+            if self.ngram:
+                return max(0, math.log((len(self.ngram_body_bow_list) - df / df)))
+            return max(0, math.log((len(self.body_bow_list) - df / df)))
+
+    def norm(self, document, mode = "c"):
+        if mode == "n":
+            return 1
+        elif mode == "c":
+            return np.linalg.norm(list(document.values()))
+
+
 class OnIssueEventTracking:
     def __init__(self, df, inverted_index, issue_list, config):
         self.df = df
@@ -328,29 +463,6 @@ class RelatedIssueEventTracking:
             related_issue_event_clusters = self.related_issue_event_tracking(issue_words, self.inverted_index, ngram_body_bow_list)
             detailed_info = self.get_detailed_info_list_from_event_clusters(related_issue_event_clusters)
             self.print_related_issue_event_tracking_result(issue, detailed_info)
-        """df = self.df
-        for i, issue in enumerate(self.issue_list):
-            issue_words = self.preprocessor.preprocess(issue)
-
-            ngram_body_bow_list = []
-            ngram_cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number, ngram=len(issue_words)) for cluster_number in set(df["cluster_number"].tolist())}
-            ngram_cluster_number_to_docs_and_avg_bow = sorted(ngram_cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
-            ngram_body_bow_list.append([avg_bow for cluster_number, avg_bow in ngram_cluster_number_to_docs_and_avg_bow])
-            if (len(issue_words) == 1):
-                ngram_cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number, ngram=1) for cluster_number in set(df["cluster_number"].tolist())}
-                ngram_cluster_number_to_docs_and_avg_bow = sorted(ngram_cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
-                ngram_body_bow_list.append([avg_bow for cluster_number, avg_bow in ngram_cluster_number_to_docs_and_avg_bow])
-            else:
-                ngram_cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number, ngram=len(issue_words) // 2) for cluster_number in set(df["cluster_number"].tolist())}
-                ngram_cluster_number_to_docs_and_avg_bow = sorted(ngram_cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
-                ngram_body_bow_list.append([avg_bow for cluster_number, avg_bow in ngram_cluster_number_to_docs_and_avg_bow])
-                ngram_cluster_number_to_avg_bow = {cluster_number : self.get_cluster_number_to_average_bow(cluster_number, ngram=len(issue_words) - len(issue_words) // 2) for cluster_number in set(df["cluster_number"].tolist())}
-                ngram_cluster_number_to_docs_and_avg_bow = sorted(ngram_cluster_number_to_avg_bow.items(), key = lambda item: item[0]) # sorted by clsuter_number
-                ngram_body_bow_list.append([avg_bow for cluster_number, avg_bow in ngram_cluster_number_to_docs_and_avg_bow])
-
-            related_issue_event_clusters = self.related_issue_event_tracking(issue_words, ngram_body_bow_list)
-            detailed_info = self.get_detailed_info_list_from_event_clusters(related_issue_event_clusters)
-            self.print_related_issue_event_tracking_result(issue, detailed_info)"""
 
     def get_total_bow(self, body_bow_list):
         total_bow = dict()
@@ -616,138 +728,3 @@ class DetailedInfoExtractor:
                 nonproper_words.append(word)
 
         return list(set([word for word in parsed_list if word not in duplicated_words and word not in nonproper_words]))
-
-
-class InformationRetrieval2:
-    """def __init__(self, body_bow_list):
-        self.body_bow_list = body_bow_list"""
-    def __init__(self, df, inverted_index, config):
-        self.df = df
-        self.inverted_index = inverted_index
-        self.body_bow_list = [self.get_bow_from_words(words)  for _, words in self.df["preprocessed_body"].iteritems()]
-        self.total_bow =  self.get_total_bow(self.body_bow_list)
-        self.sorted_words = sorted(self.total_bow.keys())
-        self.output_dir = config["vectorize"]["final_dataframe_dir"]
-
-    def get_bow_from_words(self, words):
-        bow = dict()
-        for word in words:
-            if bow.get(word):
-                bow[word] += 1
-            else:
-                bow[word] = 1
-        return bow
-
-    def get_total_bow(self, body_bow_list):
-        total_bow = dict()
-        for body_bow in body_bow_list:
-            total_bow = dict(Counter(total_bow) + Counter(body_bow))
-        return total_bow
-
-    def get_tfidf_vector_list(self, mode = "bm25"):
-        tfidf_vector_list = []
-        vector_length = len(self.sorted_words)
-
-        for body_bow in self.body_bow_list:
-            tfidf_vector = np.zeros(vector_length)
-            for word in body_bow.keys():
-                if mode == "tfidf":
-                    tfidf_vector[self.sorted_words.index(word)] = self.tfidf(word, body_bow, self.inverted_index)
-                else: # "bm25"
-                    tfidf_vector[self.sorted_words.index(word)] = self.bm25(word, body_bow, self.inverted_index)
-            tfidf_vector_list.append(tfidf_vector)
-
-        self.df["tfidf_vector"] = tfidf_vector_list
-        # with open(self.output_dir, "wb") as f:
-        #     pickle.dump(self.df, f)
-        return self.df
-
-    def score_document(self, query, document, mode = "tfidf", ngram_body_bow_list=None): # mode = "tfidf" or "bm25"
-        if self.norm(query) * self.norm(document) == 0:
-            return 0
-        if ngram_body_bow_list:
-            self.ngram_body_bow_list = ngram_body_bow_list
-            self.ngram = True
-        else:
-            self.ngram = False
-
-        score = 0
-        terms = set(query.keys()) & set(document.keys())
-        for term in terms:
-            if mode == "tfidf":
-                score += self.tfidf(term, query) * self.tfidf(term, document)
-            else: # "bm25"
-                score += self.bm25(term, query) * self.bm25(term, document)
-        score /= self.norm(query) * self.norm(document)
-        return score
-
-    def bm25(self, term, document, inverted_index):
-        k1, b, N = 2.0, 0.75, len(self.body_bow_list)
-
-        if not inverted_index.get(term):
-            n = 0
-        else:
-            n = len(set(inverted_index[term]).intersection(self.df['id'].tolist()))
-
-        doc_length = np.sum(list(document.values()))
-        avg_doc_length = np.mean([np.sum(list(body_bow.values())) for body_bow in self.body_bow_list])
-
-        denom = k1 * ((1- b) + (b * doc_length / avg_doc_length)) + self.tf(term, document)
-        return self.tf(term, document) / denom * math.log((N - n + 0.5) / (n + 0.5))
-
-    def tfidf(self, term, document):
-        return self.tf(term, document) * self.idf(term, document, self.inverted_index)
-    
-    def tf(self, term, document, mode = "l"):
-        if document[term] == 0:
-            return 0
-
-        if mode == "n":
-            return document[term]
-        elif mode == "l":
-            return 1 + math.log(document[term])
-        elif mode == "a":
-            return 0.5 + (0.5 * document[term]) / max(document.values())
-        else: # log ave
-            return (1 + math.log(document[term])) / (1 + math.log(sum(document.values()) / len(document.values())))
-
-    def idf(self, term, document, inverted_index, mode = "t"):
-        if document[term] == 0:
-            return 0
-
-        """df = 0 # document frequency
-        if self.ngram_body_bow_list:
-            for body_bow in self.ngram_body_bow_list:
-                if body_bow.get(term):
-                    df += 1
-        else:
-            for body_bow in self.body_bow_list:
-                if body_bow.get(term):
-                    df += 1"""
-        if self.ngram:
-            df = 0
-            for body_bow in self.ngram_body_bow_list.items():
-                try:
-                    if body_bow[1].get(term):
-                        df += 1
-                except:
-                    pass
-        else:
-            df = len(set(inverted_index[term]).intersection(self.df['id'].tolist()))
-
-        if mode == "n":
-            return 1
-        elif mode == "t":
-            if self.ngram:
-                return math.log(len(self.ngram_body_bow_list) / df)
-            return math.log(len(self.body_bow_list) / df)
-        else: # prob idf
-            if self.ngram:
-                return max(0, math.log((len(self.ngram_body_bow_list) - df / df)))
-            return max(0, math.log((len(self.body_bow_list) - df / df)))
-
-    def norm(self, document, mode = "c"):
-        if mode == "n":
-            return 1
-        elif mode == "c":
-            return np.linalg.norm(list(document.values()))
