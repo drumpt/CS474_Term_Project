@@ -67,6 +67,17 @@ This command will install the uploaded version of the file on github.
         ....
 }
 ```
+#### Possible parameters
+
+Parameter | value
+--- | ---
+data_dir | "dataset", "sample_dataset"
+doc2vec/partial_weight | {"title": x, "body": y, "section": z}, where x + y + z = 1 and x, y, z >= 0
+clustering/method | "hierarchical", "DBSCAN", "OPTICS"
+on_issue_event_tracking | "normal", "consecutive"
+detailed_info_extractor/summary_target | "title", "description", "body"
+
+
 We manage the variables used in the overall process through [config.json](https://github.com/drumpt/CS474_Term_Project/blob/main/config.json). Various settings can be applied by changing the value of each variable in this file.
 
 ### 3. Run main function
