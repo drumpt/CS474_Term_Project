@@ -322,7 +322,7 @@ class OnIssueEventTracking:
                 body_score_dict[cluster_number] = score
 
             # on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)
-            on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[: 2 * num_events]
+            on_issue_events = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
             on_issue_events = [on_issue_event[0] for on_issue_event in on_issue_events]
             on_issue_events = sorted(on_issue_events, key = lambda idx: get_average_timestamp_from_cluster_number(idx))
 
@@ -348,7 +348,7 @@ class OnIssueEventTracking:
                         score = np.dot(in_order_issue_tfidf_vector, avg_tfidf_vector_for_cluster) / np.linalg.norm(in_order_issue_tfidf_vector) * np.linalg.norm(avg_tfidf_vector_for_cluster)
                     body_score_dict[cluster_number] = score
 
-                on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:2 * num_events]
+                on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
                 # on_issue_event_candidates = sorted(body_score_dict.items(), key = lambda x: x[1], reverse = True)[:num_events]
                 on_issue_event_candidates = [on_issue_event_candidate[0] for on_issue_event_candidate in on_issue_event_candidates]
 
@@ -621,7 +621,6 @@ class DetailedInfoExtractor:
             self.summarizer = pipeline('summarization')
         elif self.summary_method == "textrank":
             pass
-            # self.summarizer = summarize
 
         # NER
         self.ner_method = config["detailed_info_extractor"]["ner_method"]

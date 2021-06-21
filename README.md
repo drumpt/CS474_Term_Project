@@ -74,7 +74,7 @@ Parameter | value
 data_dir | "dataset", "sample_dataset"
 doc2vec/partial_weight | {"title": x, "body": y, "section": z}, where x + y + z = 1 and x, y, z >= 0
 clustering/method | "hierarchical", "DBSCAN", "OPTICS"
-on_issue_event_tracking | "normal", "consecutive"
+on_issue_event_tracking/method | "normal", "consecutive"
 detailed_info_extractor/summary_target | "title", "description", "body"
 
 
@@ -85,7 +85,7 @@ We manage the variables used in the overall process through [config.json](https:
 ./run.sh
 ```
 
-## :bulb: Build and run on docker
+## :clipboard: Build and run on docker
 ### 1. Install docker and download repository
 First, install docker on your computer and clone this repository. Below is the comand for cloning current version of the file on github.
 ```
@@ -100,7 +100,7 @@ docker build . -t "cs474_term_project"
 ```
 
 ### 3. Run docker image
-First identify "IMAGE_ID" for built docker image and type the command below.
+First identify "IMAGE_ID" for built docker image by typing "docker images" and type the command below.
 ```
 docker run -it "IMAGE_ID" ./run_on_docker.sh
 ```

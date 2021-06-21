@@ -83,7 +83,6 @@ class DocumentFilter:
                     else:
                         temp_candidate_id = temp_candidate_id.intersection(self.inverted_index.get(word))
             candidate_id = temp_candidate_id.union(temp_candidate_id)
-        print(len(candidate_id))
         return candidate_id
     
     def apply_filtering(self):

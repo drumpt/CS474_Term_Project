@@ -21,7 +21,7 @@ def main(config):
     with open(config["vectorize"]["inverted_index_dir"], "rb") as f:
         inverted_index = pickle.load(f)
     # issue_selector = utils.IssueSelector(config, inverted_index)
-    issue_list = ['Japanese military sexual slavery agreement between Korea and Japan', 'Sewol Ferry Disaster'] # selected issues
+    issue_list = ["Japanese military sexual slavery agreement between Korea and Japan", "North Korea Nuclear Test", "pyeongchang olympic"] # selected issues
 
     document_filter = preprocess.DocumentFilter(df, issue_list, inverted_index)
     filtered_df = document_filter.apply_filtering()
