@@ -45,7 +45,7 @@ This command divides dataset into articles from 2015, 2016, and 2017 and identif
 ## :computer: Usage
 ### 1. Download repository
 ```
-git clone https://github.com/drumpt/CS474_Term_Project
+git clone --recursive https://github.com/drumpt/CS474_Term_Project
 ```
 This command will install the uploaded version of the file on github.
 
