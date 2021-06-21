@@ -16,14 +16,12 @@ import information_retrieval
 
 
 def main(config):
-    issue_list = ['Kim Jong-nam Assassination', 'Pyeongchang Olympic'] # hard-coded issues
-
     json_list = utils.get_json_list_from_data_dir(config["data_dir"])
     df = utils.get_dataframe_from_json_list(json_list)
     with open(config["vectorize"]["inverted_index_dir"], "rb") as f:
         inverted_index = pickle.load(f)
-
-    issue_selector = utils.IssueSelector(config, inverted_index)
+    # issue_selector = utils.IssueSelector(config, inverted_index)
+    issue_list = ['Japanese military sexual slavery agreement between Korea and Japan', 'Sewol Ferry Disaster'] # selected issues
 
     document_filter = preprocess.DocumentFilter(df, issue_list, inverted_index)
     filtered_df = document_filter.apply_filtering()
@@ -33,6 +31,7 @@ def main(config):
 
     clusterizer = clustering.Clustering(vectorized_df, config)
     clustered_df = clusterizer.apply_clustering()
+    # clusterizer.evaluate()
 
     tfidf_vectorizer = information_retrieval.InformationRetrieval(clustered_df, inverted_index, config)
     final_df = tfidf_vectorizer.get_tfidf_vector_list()

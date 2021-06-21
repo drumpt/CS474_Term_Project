@@ -47,7 +47,7 @@ class InformationRetrieval:
             total_bow = dict(Counter(total_bow) + Counter(body_bow))
         return total_bow
 
-    def get_tfidf_vector_list(self, mode = "bm25"):
+    def get_tfidf_vector_list(self, mode = "tfidf"):
         tfidf_vector_list = []
         vector_length = len(self.sorted_words)
 
@@ -100,6 +100,8 @@ class InformationRetrieval:
             return 0
 
         df = len(set(inverted_index[term]).intersection(self.df['id'].tolist()))
+        if df == 0:
+            return 0
 
         if mode == "n":
             return 1
@@ -135,7 +137,7 @@ class InformationRetrieval2:
             total_bow = dict(Counter(total_bow) + Counter(body_bow))
         return total_bow
 
-    def get_tfidf_vector_list(self, mode = "bm25"):
+    def get_tfidf_vector_list(self, mode = "tfidf"):
         tfidf_vector_list = []
         vector_length = len(self.sorted_words)
 
@@ -301,7 +303,7 @@ class OnIssueEventTracking:
             issue_tfidf_vector = np.zeros(len(sorted_words))
             for issue_token in self.preprocessor.preprocess(issue):
                 try:
-                    issue_tfidf_vector[sorted_words.index(issue_token)] += 1
+                    issue_tfidf_vector[sorted_words.index(issue_token)] += 1 / len(set(inverted_index.get(issue_token)).intersection(self.df["id"].tolist()))
                 except:
                     pass
             return issue_tfidf_vector

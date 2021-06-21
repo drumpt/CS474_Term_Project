@@ -1,6 +1,7 @@
 # Basic Library
 argparse
 setuptools
+progressbar
 
 # Machine Learning and NLP
 pandas
@@ -8,7 +9,7 @@ nltk
 sklearn
 numpy==1.19.5
 gensim==4.0.1
-python-Levenshtein
+# python-Levenshtein
 spacy
 torch
 tensorflow
@@ -16,5 +17,5 @@ transformers==2.11.0
 sentencepiece==0.1.91
 pytorch-transformers
 cython
-neuralcoref
+# neuralcoref==3.9
 summarizer

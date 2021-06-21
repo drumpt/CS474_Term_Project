@@ -90,8 +90,6 @@ class Vectorizer:
             + self.part_weight["section"] * normalize(self.df["vectorized_section"])
         vectorized_time = np.expand_dims(normalize(self.df['vectorized_time']), axis = 1)
 
-        # print(vectorized_full_text)
-
         self.df["vector"] = np.concatenate((vectorized_full_text, vectorized_time), axis = 1).tolist()
         # print(self.df["vector"])
         return self.df
@@ -140,16 +138,17 @@ class Clustering:
         self.method = config["clustering"]["method"]
 
     def apply_clustering(self):
-        if self.method == "DBSCAN":
-            clusterizer = DBSCAN(eps = 0.1, min_samples = 1).fit(self.df["vector"].tolist())
-        elif self.method == "hierarchical":
-            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5).fit(self.df["vector"].tolist())
+        if self.method == "hierarchical":
+            clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 10).fit(self.df["vector"].tolist())
+        elif self.method == "DBSCAN":
+            clusterizer = DBSCAN(eps = 10, min_samples = 1).fit(self.df["vector"].tolist())
         elif self.method == "OPTICS":
-            clusterizer = OPTICS(eps = 0.1, min_samples = 2).fit(self.df["vector"].tolist())
+            clusterizer = OPTICS(eps = 10, min_samples = 2).fit(self.df["vector"].tolist())
         else:
             raise Exception(f"Invalid: {self.method}")
 
         self.df["cluster_number"] = clusterizer.labels_
+        # print(self.df["cluster_number"])
         return self.df
 
     def evaluate(self):
@@ -157,7 +156,10 @@ class Clustering:
         class_number = [0, 1, 2, 3, 3, 4, 5, 6, 7, 5, 8, 9, 10, 11, 7, 12, 13, 14, 15, 7, 16, 13, 7, 17, 18, 13, 16, 19, 20, 17]
         self.evaluated_df = self.df.head(30)
 
+        print(f"Evaluation result of {self.method} clustering")
+        print("==================================================")
         print(f"Rand index : {metrics.rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
         print(f"Adjusted rand index : {metrics.adjusted_rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
         print(f"Mutual information : {metrics.adjusted_mutual_info_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
         print(f"Homogeneity score : {metrics.homogeneity_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print("\n\n\n")

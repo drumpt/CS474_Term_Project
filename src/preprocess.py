@@ -74,10 +74,16 @@ class DocumentFilter:
         candidate_id = set()
         for issue in issue_list:
             temp_candidate_id = set()
+            is_first_token = True
             for word in preprocessor.preprocess(issue):
                 if self.inverted_index.get(word):
-                    temp_candidate_id = temp_candidate_id.union(self.inverted_index.get(word))
+                    if is_first_token:
+                        temp_candidate_id = temp_candidate_id.union(self.inverted_index.get(word))
+                        is_first_token = False
+                    else:
+                        temp_candidate_id = temp_candidate_id.intersection(self.inverted_index.get(word))
             candidate_id = temp_candidate_id.union(temp_candidate_id)
+        print(len(candidate_id))
         return candidate_id
     
     def apply_filtering(self):
