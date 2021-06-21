@@ -91,7 +91,7 @@ We manage the variables used in the overall process through [config.json](https:
 ### 1. Install docker and download repository
 First, install docker on your computer and clone this repository. Below is the comand for cloning current version of the file on github.
 ```
-git clone https://github.com/drumpt/CS474_Term_Project
+git clone --recursive https://github.com/drumpt/CS474_Term_Project
 ```
 
 ### 2. Build docker image
