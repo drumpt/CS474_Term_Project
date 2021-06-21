@@ -22,7 +22,28 @@ Text mining is an area where various analytical methods and approaches are being
 git clone https://github.com/drumpt/CS474_Term_Project
 ```
 This command will install the uploaded version of the file on github.
-### 2. Run main function
+
+### 2. Configure parameters
+```
+{
+    "data_dir": "dataset",
+    "lda": {
+        "num_trends": 10
+    },
+    "doc2vec": {
+        "part_weight": {
+            "title": 0,
+            "body": 1,
+            "section": 0
+        },
+        "epoch": 50,
+        "embedding_dim": 256,
+        ....
+}
+```
+We manage the variables used in the overall process through [config.json](https://github.com/drumpt/CS474_Term_Project/blob/main/config.json). Various settings can be applied by changing the value of each variable in this file.
+
+### 3. Run main function
 ```
 ./run.sh
 ```
