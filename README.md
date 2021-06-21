@@ -16,6 +16,13 @@ Text mining is an area where various analytical methods and approaches are being
 - Data Format : Json
 - Repository : [CS474_Term_Project/dataset](https://github.com/drumpt/CS474_Term_Project/tree/main/dataset)
 
+## :pencil2: Pre-learning
+### LDA to find Issues
+```
+python3 ./src/lda_test.py
+```
+This command divides dataset into articles from 2015, 2016, and 2017 and identifies the Issues for each via LDA and stores them in a txt file. Created txt files are stored in the [output repository](https://github.com/drumpt/CS474_Term_Project/tree/main/output).
+
 ## :computer: Usage
 ### 1. Download repository
 ```
