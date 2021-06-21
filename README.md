@@ -1,5 +1,5 @@
 # 2021 Spring CS474 Term Project
-Group project (Team 1) for 2021 Spring CS474 TextMining course
+Term project for 2021 Spring CS474 Text Mining course in [KAIST](https://kaist.ac.kr)
 
 ## 🏠 [Github page](https://github.com/comafj/CS489-Team-14-repository)
 
