@@ -11,8 +11,8 @@ from nltk.stem import WordNetLemmatizer
 
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO)
 
 
 def _read(path):
@@ -30,7 +30,7 @@ def _full_paths(directory):
 
 
 def docs_by_id(directory):
-    logger.info('Loading documents from {}'.format(directory))
+    # logger.info('Loading documents from {}'.format(directory))
     return {_doc_id(path): _read(path) for path in _full_paths(directory)}
 
 

@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 
+import preprocess
 
 def get_json_list_from_data_dir(data_dir):
     '''
@@ -83,10 +84,6 @@ def get_dataframe_from_json_list_by_year(json_list):
                             "section": data[" section"][di]}
                 df_list_3.append(pd.DataFrame(new_data, index=[0]))
 
-    # print(f"LEN IS {len(df_list_1)}")
-    # print(f"LEN IS {len(df_list_2)}")
-    # print(f"LEN IS {len(df_list_3)}")
-
     df_1 = pd.concat(df_list_1).reset_index(drop=True)
     df_1.columns = ['title', 'author', 'time', 'description', 'body', 'section']
     df_2 = pd.concat(df_list_2).reset_index(drop=True)
@@ -94,6 +91,44 @@ def get_dataframe_from_json_list_by_year(json_list):
     df_3 = pd.concat(df_list_3).reset_index(drop=True)
     df_3.columns = ['title', 'author', 'time', 'description', 'body', 'section']
     return df_1, df_2, df_3
+
+
+class IssueSelector:
+    def __init__(self, config, inverted_index):
+        self.issue_file_list = config["issue_file_list"]
+        self.inverted_index = inverted_index
+
+        self.issue_list = ["Sewol Ferry Disaster", "MERS", "History text nationalization", \
+            "Choi Soon-sil national affair scandal", "Japanese military sexual slavery agreement between Korea and Japan", \
+            "AlphaGo vs. Lee Se-dol", "North Korea Nuclear Test", "Pohang earthquake/Korea SAT delay"]
+        for file_dir in self.issue_file_list:
+            self.issue_list.extend(self.get_issue_list_from_file(file_dir))
+        self.issue_list = list(set(self.issue_list))
+        self.get_relevant_document_count(self.issue_list)
+
+    def get_issue_list_from_file(self, file_dir):
+        issue_list = []
+        with open(file_dir, "r") as f:
+            issue_str_list = f.readlines()
+            for issue_str in issue_str_list:
+                issue_list.append(issue_str.strip())
+        return issue_list
+
+    def get_relevant_document_count(self, issue_list):
+        preprocessor = preprocess.Preprocessor()
+        print(f"Number of relevant document for each issue")
+        print(f"==========================================")
+        for issue in issue_list:
+            candidate_id = set()
+            is_first_token = True
+            for word in preprocessor.preprocess(issue):
+                if self.inverted_index.get(word):
+                    if is_first_token:
+                        candidate_id = candidate_id.union(self.inverted_index.get(word))
+                        is_first_token = False
+                    else:
+                        candidate_id = candidate_id.intersection(self.inverted_index.get(word))
+            print(f"{issue} : {len(candidate_id)}")
 
 
 if __name__ == "__main__":

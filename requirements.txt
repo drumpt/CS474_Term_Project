@@ -12,8 +12,8 @@ python-Levenshtein
 spacy
 torch
 tensorflow
-transformers=2.11.0
-sentencepiece==0.1.92
+transformers==2.11.0
+sentencepiece==0.1.91
 pytorch-transformers
 cython
 neuralcoref

@@ -10,7 +10,8 @@ np.seterr(divide='ignore', invalid='ignore')
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 from gensim.models.callbacks import CallbackAny2Vec
 
-from sklearn.cluster import DBSCAN, OPTICS, AgglomerativeClustering
+from sklearn.cluster import DBSCAN, AgglomerativeClustering, OPTICS
+from sklearn import metrics
 
 import preprocess
 
@@ -18,16 +19,8 @@ class Vectorizer:
     def __init__(self, df, config):
         self.preprocessor = preprocess.Preprocessor()
         self.df = df
-
-        print("vectorizing 1")
-
         self.df["preprocessed_body"] = df["body"].apply(self.preprocessor.preprocess)
-
-        print("vectorizing 2")
-
         self.df["preprocessed_title"] = df["title"].apply(self.preprocessor.preprocess)
-
-        print("vectorizing 3")
 
         self.tagged_body = [TaggedDocument(words = row["preprocessed_body"], tags = [row["id"]]) for _, row in self.df.iterrows()]
         self.part_weight = config["doc2vec"]["part_weight"]
@@ -97,18 +90,10 @@ class Vectorizer:
             + self.part_weight["section"] * normalize(self.df["vectorized_section"])
         vectorized_time = np.expand_dims(normalize(self.df['vectorized_time']), axis = 1)
 
-        """print("Which one is the problem?")
-        print(normalize(self.df["vectorized_title"]))
-        print(normalize(self.df["vectorized_body"]))
-        print(normalize(self.df["vectorized_section"]))
-        print(vectorized_full_text)
-        print(vectorized_time)
-        print("shape")
-        print(vectorized_full_text.shape)
-        print(vectorized_time.shape)"""
+        # print(vectorized_full_text)
 
-        self.df["vector"] = pd.Series(np.concatenate((vectorized_full_text, vectorized_time), axis = 1).tolist())
-        #print(self.df["vector"])
+        self.df["vector"] = np.concatenate((vectorized_full_text, vectorized_time), axis = 1).tolist()
+        # print(self.df["vector"])
         return self.df
 
 
@@ -145,7 +130,7 @@ class InvertedIndex:
 
         with open(self.output_dir, "wb") as f:
             pickle.dump(inverted_index, f)
-        print("Finish making inverted index!")
+        # print("Finish making inverted index!")
         return inverted_index
 
 
@@ -155,36 +140,24 @@ class Clustering:
         self.method = config["clustering"]["method"]
 
     def apply_clustering(self):
-
         if self.method == "DBSCAN":
-            # experiemnt
-            for i in np.arange(0.001, 1, 0.001):
-                clusterizer = DBSCAN(eps = i, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
-                print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
-            clusterizer = DBSCAN(eps = 0.1, min_samples = 1, metric = "cosine").fit(self.df["vector"].tolist())
-
+            clusterizer = DBSCAN(eps = 0.1, min_samples = 1).fit(self.df["vector"].tolist())
         elif self.method == "hierarchical":
-            # # experiemnt
-            # for i in np.arange(0.01, 100, 0.01):
-            #     clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = i).fit(self.df["vector"].tolist())
-            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
             clusterizer = AgglomerativeClustering(n_clusters = None, distance_threshold = 5).fit(self.df["vector"].tolist())
-
         elif self.method == "OPTICS":
-            # # experiemnt
-            # for i in np.arange(1, 100):
-            #     clusterizer = OPTICS(eps = i, min_samples = 2).fit(self.df["vector"].tolist())
-            #     print(i, len(pd.Series(clusterizer.labels_).value_counts()))
-
             clusterizer = OPTICS(eps = 0.1, min_samples = 2).fit(self.df["vector"].tolist())
         else:
-            raise Exception(f"Invalid: {self.weight_dir}")            
-        
+            raise Exception(f"Invalid: {self.method}")
+
         self.df["cluster_number"] = clusterizer.labels_
         return self.df
 
-    # TODO: need to evaluate various clustering algorithms
     def evaluate(self):
-        pass
+        # hard-coded class-label
+        class_number = [0, 1, 2, 3, 3, 4, 5, 6, 7, 5, 8, 9, 10, 11, 7, 12, 13, 14, 15, 7, 16, 13, 7, 17, 18, 13, 16, 19, 20, 17]
+        self.evaluated_df = self.df.head(30)
+
+        print(f"Rand index : {metrics.rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Adjusted rand index : {metrics.adjusted_rand_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Mutual information : {metrics.adjusted_mutual_info_score(class_number, self.evaluated_df['cluster_number'].tolist())}")
+        print(f"Homogeneity score : {metrics.homogeneity_score(class_number, self.evaluated_df['cluster_number'].tolist())}")

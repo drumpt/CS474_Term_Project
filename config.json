@@ -1,8 +1,10 @@
 {
     "data_dir": "dataset",
     "lda": {
-        "num_trends": 10
+        "num_trends": 100,
+	"num_passes" : 30
     },
+    "issue_file_list": ["output/2015_Issues.txt", "output/2016_Issues.txt", "output/2017_Issues.txt"],
     "doc2vec": {
         "part_weight": {
             "title": 0,
@@ -24,7 +26,7 @@
         "method": "hierarchical"
     },
     "on_issue_event_tracking": {
-        "method": "normal"
+        "method": "consecutive"
     },
     "detailed_info_extractor": {
         "summary_method": "transformer",

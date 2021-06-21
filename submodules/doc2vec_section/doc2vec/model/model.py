@@ -9,8 +9,8 @@ from tensorflow.keras.optimizers import SGD
 import numpy as np
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO)
 
 
 DEFAULT_WINDOW_SIZE = 8
@@ -82,14 +82,14 @@ class Doc2VecModel(object):
         return history
 
     def save(self, path):
-        logger.info('Saving model to %s', path)
+        # logger.info('Saving model to %s', path)
         self._model.save(path)
 
     def save_doc_embeddings(self, path):
         _write_doc_embeddings(self.doc_embeddings, path)
 
     def load(self, path):
-        logger.info('Loading model from %s', path)
+        # logger.info('Loading model from %s', path)
         self._model = load_model(path)
 
 
@@ -121,6 +121,6 @@ def _section_embeddings_from_model(keras_model):
 
 
 def _write_doc_embeddings(doc_embeddings, path):
-    logger.info('Saving doc embeddings to %s', path)
+    # logger.info('Saving doc embeddings to %s', path)
     with h5py.File(path, 'w') as f:
         f.create_dataset(DOC_EMBEDDINGS_LAYER_NAME, data=doc_embeddings)

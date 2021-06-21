@@ -4,8 +4,9 @@ import json
 import re
 
 import nltk
-nltk.download('punkt')
-nltk.download('stopwords')
+nltk.download('punkt', quiet = True)
+nltk.download('stopwords', quiet = True)
+
 
 class Preprocessor:
     def __init__(self):
@@ -61,3 +62,25 @@ class Preprocessor:
         '''
         snowball = nltk.stem.SnowballStemmer("english")
         return [snowball.stem(word) for word in words]
+
+class DocumentFilter:
+    def __init__(self, df, issue_list, inverted_index):
+        self.df = df
+        self.issue_list = issue_list
+        self.inverted_index = inverted_index
+
+    def get_candidate_id(self, issue_list):
+        preprocessor = Preprocessor()
+        candidate_id = set()
+        for issue in issue_list:
+            temp_candidate_id = set()
+            for word in preprocessor.preprocess(issue):
+                if self.inverted_index.get(word):
+                    temp_candidate_id = temp_candidate_id.union(self.inverted_index.get(word))
+            candidate_id = temp_candidate_id.union(temp_candidate_id)
+        return candidate_id
+    
+    def apply_filtering(self):
+        candidate_id = self.get_candidate_id(self.issue_list)
+        document_filter = lambda row: row['id'] in candidate_id
+        return self.df[self.df.apply(document_filter, axis = 1)].copy()
