@@ -54,17 +54,18 @@ This command will install the uploaded version of the file on github.
 {
     "data_dir": "dataset",
     "lda": {
-        "num_trends": 10
+        "num_trends": 100,
+	    "num_passes" : 30
     },
+    "issue_file_list": ["output/2015_Issues.txt", "output/2016_Issues.txt", "output/2017_Issues.txt"],
     "doc2vec": {
         "part_weight": {
             "title": 0,
             "body": 1,
             "section": 0
         },
-        "epoch": 50,
+        "epoch": 30,
         "embedding_dim": 256,
-        ....
 }
 ```
 #### Possible parameters
@@ -72,6 +73,7 @@ This command will install the uploaded version of the file on github.
 Parameter | value
 --- | ---
 data_dir | "dataset", "sample_dataset"
+lda | "num_trends", "num_passes"
 doc2vec/partial_weight | {"title": x, "body": y, "section": z}, where x + y + z = 1 and x, y, z >= 0
 clustering/method | "hierarchical", "DBSCAN", "OPTICS"
 on_issue_event_tracking | "normal", "consecutive"
