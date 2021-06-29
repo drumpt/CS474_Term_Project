@@ -49,7 +49,11 @@ git clone --recursive https://github.com/drumpt/CS474_Term_Project
 ```
 This command will install the uploaded version of the file on github.
 
-### 2. Configure parameters
+### 2. Download pre-trained BERT NER model
+You can download pre-trained BERT NER model from [here](https://onedrive.live.com/?authkey=%21APyPCEUPyI8JinU&cid=390AF7A51B5537E7&id=390AF7A51B5537E7%21778&parId=390AF7A51B5537E7%21775&action=locate).
+You need to move downloaded out_large folder into ```path_to_CS474_Term_Project/models``` folder.
+
+### 3. Configure parameters
 ```
 {
     "data_dir": "dataset",
@@ -74,7 +78,7 @@ Parameter | value
 --- | ---
 data_dir | "dataset", "sample_dataset"
 lda | "num_trends", "num_passes"
-doc2vec/partial_weight | {"title": x, "body": y, "section": z}, where x + y + z = 1 and x, y, z >= 0
+doc2vec/partial_weight | {"title": x, "body": y, "section": z} (x + y + z = 1 and x, y, z >= 0)
 clustering/method | "hierarchical", "DBSCAN", "OPTICS"
 on_issue_event_tracking/method | "normal", "consecutive"
 detailed_info_extractor/summary_target | "title", "description", "body"
@@ -82,7 +86,7 @@ detailed_info_extractor/summary_target | "title", "description", "body"
 
 We manage the variables used in the overall process through [config.json](https://github.com/drumpt/CS474_Term_Project/blob/main/config.json). Various settings can be applied by changing the value of each variable in this file.
 
-### 3. Run main function
+### 4. Run main function
 ```
 ./run.sh
 ```
@@ -94,17 +98,21 @@ First, install docker on your computer and clone this repository. Below is the c
 git clone --recursive https://github.com/drumpt/CS474_Term_Project
 ```
 
-### 2. Build docker image
+### 2. Download pre-trained BERT NER model
+You can download pre-trained BERT NER model from [here](https://onedrive.live.com/?authkey=%21APyPCEUPyI8JinU&cid=390AF7A51B5537E7&id=390AF7A51B5537E7%21778&parId=390AF7A51B5537E7%21775&action=locate).
+You need to move downloaded out_large folder into ```path_to_CS474_Term_Project/models``` folder.
+
+### 3. Build docker image
 Change directory to downloaded repository and build docker image
 ```
 cd "path_to_CS474_Term_Project"
 docker build . -t "cs474_term_project"
 ```
 
-### 3. Run docker image
-First identify "IMAGE_ID" for built docker image by typing "docker images" and type the command below.
+### 4. Run docker image
+First identify ```IMAGE_ID``` for built docker image by typing ```docker images``` and type the command below.
 ```
-docker run -it "IMAGE_ID" ./run_on_docker.sh
+docker run -it IMAGE_ID ./run_on_docker.sh
 ```
 
 ## :bulb: Show on-issue event tracking evaluation result
@@ -114,7 +122,7 @@ python3 src/on_issue evaluation.py
 ```
 
 ## :chart_with_upwards_trend: Paperwork
-For more detailed implementation methods and results, you can refer to the report at the following link: [Report](https://docs.google.com/document/d/1oLPT07ocqV7-SmED2deSL15W9U-yrZMRxlp2oX1V8R0/edit)
+For more detailed implementation methods and results, you can refer to the report at the following link: [Report](https://docs.google.com/document/d/1oLPT07ocqV7-SmED2deSL15W9U-yrZMRxlp2oX1V8R0/edit?usp=sharing)
 
 ## 👤 Author
 * Github: Changhun Kim [@drumpt](https://github.com/drumpt)
