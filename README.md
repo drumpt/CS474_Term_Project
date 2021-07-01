@@ -74,7 +74,7 @@ You need to move downloaded out_large folder into ```path_to_CS474_Term_Project/
 ```
 #### Possible parameters
 
-Parameter | value
+parameter | value
 --- | ---
 data_dir | "dataset", "sample_dataset"
 lda | "num_trends", "num_passes"
