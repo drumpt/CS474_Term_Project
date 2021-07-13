@@ -1,7 +1,7 @@
 # 2021 Spring CS474 Term Project
 Term project for 2021 Spring CS474 Text Mining course in [KAIST](https://kaist.ac.kr)
 
-## 🏠 [Github page](https://github.com/comafj/CS489-Team-14-repository)
+## 🏠 [Github page](https://github.com/drumpt/CS474_Term_Project)
 
 ## :pushpin: Motivation and Objectives
 Text mining is an area where various analytical methods and approaches are being developed with the development of big data. Because most of the data around us are in text form, collecting and analyzing appropriate text is a very important area of data science.  Among them, news data is generated periodically and deals with various categories, making it a very useful form of data for text mining. Therefore, we would like to analyze Korean Herald news articles written from 2015 to 2017 to find the top 10 Issue trends for each year and analyze more detailed events. We will largely divide this into Issue Trend Analysis and Issue Tracking parts and explain each task as follows.
