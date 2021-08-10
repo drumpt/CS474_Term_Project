@@ -59,7 +59,7 @@ You need to move downloaded out_large folder into ```path_to_CS474_Term_Project/
     "data_dir": "dataset",
     "lda": {
         "num_trends": 100,
-	    "num_passes" : 30
+	"num_passes" : 30
     },
     "issue_file_list": ["output/2015_Issues.txt", "output/2016_Issues.txt", "output/2017_Issues.txt"],
     "doc2vec": {
@@ -70,6 +70,27 @@ You need to move downloaded out_large folder into ```path_to_CS474_Term_Project/
         },
         "epoch": 30,
         "embedding_dim": 256,
+        "output_dir": "weights",
+        "weight_dir": "models/weights_049_0.0000.h5",
+        "random_seed": 42
+    },
+    "vectorize": {
+        "recalculation": true,
+        "final_dataframe_dir": "output/final_dataframe.pickle",
+        "inverted_index_dir": "output/invered_index.pickle"
+    },
+    "clustering": {
+        "method": "hierarchical"
+    },
+    "on_issue_event_tracking": {
+        "method": "normal"
+    },
+    "detailed_info_extractor": {
+        "summary_method": "transformer",
+        "summary_target": "title",
+        "ner_method": "bert",
+        "ner_model_dir": "submodules/bert_ner/out_large"
+    }
 }
 ```
 #### Possible parameters
